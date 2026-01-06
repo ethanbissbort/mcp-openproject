@@ -2,8 +2,11 @@ import type {
   OpenProjectConfig,
   Project,
   WorkPackage,
+  WorkPackageType,
+  WorkPackageStatus,
   User,
   TimeEntry,
+  TimeEntryActivity,
   Collection,
   ErrorResponse,
 } from './types.js';
@@ -35,10 +38,26 @@ export class OpenProjectClient {
     });
 
     if (!response.ok) {
-      const errorData = await response.json() as ErrorResponse;
-      throw new Error(
-        `OpenProject API error: ${errorData.message || response.statusText}`
-      );
+      let errorMessage = response.statusText;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ErrorResponse;
+          errorMessage = errorData.message || errorMessage;
+        } else {
+          const textError = await response.text();
+          errorMessage = textError || errorMessage;
+        }
+      } catch {
+        // If parsing fails, use status text
+      }
+      throw new Error(`OpenProject API error (${response.status}): ${errorMessage}`);
+    }
+
+    // Handle empty responses (e.g., from DELETE)
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return {} as T;
     }
 
     return response.json() as Promise<T>;
@@ -316,5 +335,39 @@ export class OpenProjectClient {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async listWorkPackageTypes(): Promise<Collection<WorkPackageType>> {
+    return this.request<Collection<WorkPackageType>>('/types');
+  }
+
+  async getWorkPackageType(id: string): Promise<WorkPackageType> {
+    return this.request<WorkPackageType>(`/types/${id}`);
+  }
+
+  async listWorkPackageStatuses(): Promise<Collection<WorkPackageStatus>> {
+    return this.request<Collection<WorkPackageStatus>>('/statuses');
+  }
+
+  async getWorkPackageStatus(id: string): Promise<WorkPackageStatus> {
+    return this.request<WorkPackageStatus>(`/statuses/${id}`);
+  }
+
+  async listTimeEntryActivities(params?: {
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<TimeEntryActivity>> {
+    const queryParams = new URLSearchParams();
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<TimeEntryActivity>>(
+      `/time_entries/activities${query ? '?' + query : ''}`
+    );
+  }
+
+  async getTimeEntryActivity(id: string): Promise<TimeEntryActivity> {
+    return this.request<TimeEntryActivity>(`/time_entries/activities/${id}`);
   }
 }

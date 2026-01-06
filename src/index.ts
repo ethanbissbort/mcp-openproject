@@ -29,6 +29,22 @@ if (!OPENPROJECT_URL || !OPENPROJECT_API_KEY) {
   process.exit(1);
 }
 
+// Validate URL format
+try {
+  const url = new URL(OPENPROJECT_URL);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    console.error('Error: OPENPROJECT_URL must use http:// or https:// protocol');
+    process.exit(1);
+  }
+  // Warn if not using HTTPS
+  if (url.protocol === 'http:') {
+    console.error('Warning: Using HTTP instead of HTTPS is not recommended for security');
+  }
+} catch (error) {
+  console.error('Error: OPENPROJECT_URL is not a valid URL');
+  process.exit(1);
+}
+
 const client = new OpenProjectClient({
   baseUrl: OPENPROJECT_URL,
   apiKey: OPENPROJECT_API_KEY,
@@ -345,6 +361,81 @@ const tools: Tool[] = [
       },
     },
   },
+  {
+    name: 'list_work_package_types',
+    description: 'List all work package types (e.g., Task, Bug, Feature) available in OpenProject',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_work_package_type',
+    description: 'Get details of a specific work package type by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Work package type ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_work_package_statuses',
+    description: 'List all work package statuses (e.g., New, In Progress, Closed) available in OpenProject',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_work_package_status',
+    description: 'Get details of a specific work package status by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Work package status ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_time_entry_activities',
+    description: 'List all time entry activities (e.g., Development, Testing, Documentation)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pageSize: {
+          type: 'number',
+          description: 'Number of results per page (default: 20)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Offset for pagination (default: 1)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_time_entry_activity',
+    description: 'Get details of a specific time entry activity by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Time entry activity ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -551,6 +642,81 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           pageSize: args?.pageSize as number | undefined,
           offset: args?.offset as number | undefined,
         });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_work_package_types': {
+        const result = await client.listWorkPackageTypes();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_type': {
+        const result = await client.getWorkPackageType(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_work_package_statuses': {
+        const result = await client.listWorkPackageStatuses();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_status': {
+        const result = await client.getWorkPackageStatus(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_time_entry_activities': {
+        const result = await client.listTimeEntryActivities({
+          pageSize: args?.pageSize as number | undefined,
+          offset: args?.offset as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_time_entry_activity': {
+        const result = await client.getTimeEntryActivity(args.id as string);
         return {
           content: [
             {

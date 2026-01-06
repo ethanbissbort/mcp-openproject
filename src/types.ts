@@ -13,6 +13,45 @@ export interface HalLinks {
   [key: string]: HalLink | HalLink[] | undefined;
 }
 
+export interface WorkPackageType {
+  _type: string;
+  id: number;
+  name: string;
+  color: string;
+  position: number;
+  isDefault: boolean;
+  isMilestone: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _links: HalLinks;
+}
+
+export interface WorkPackageStatus {
+  _type: string;
+  id: number;
+  name: string;
+  isClosed: boolean;
+  color: string;
+  isDefault: boolean;
+  isReadonly: boolean;
+  defaultDoneRatio?: number;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+  _links: HalLinks;
+}
+
+export interface TimeEntryActivity {
+  _type: string;
+  id: number;
+  name: string;
+  position: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _links: HalLinks;
+}
+
 export interface Project {
   _type: string;
   id: number;
@@ -54,8 +93,8 @@ export interface WorkPackage {
   _links: HalLinks;
   _embedded?: {
     project?: Project;
-    type?: any;
-    status?: any;
+    type?: WorkPackageType;
+    status?: WorkPackageStatus;
     assignee?: User;
     author?: User;
   };
@@ -94,7 +133,7 @@ export interface TimeEntry {
     project?: Project;
     workPackage?: WorkPackage;
     user?: User;
-    activity?: any;
+    activity?: TimeEntryActivity;
   };
 }
 

@@ -8,8 +8,11 @@ This MCP server provides tools to:
 
 - **Projects**: List, get, create, and update projects
 - **Work Packages**: List, get, create, update, and delete work packages (tasks/issues)
+- **Work Package Types**: List and get work package types (Task, Bug, Feature, etc.)
+- **Work Package Statuses**: List and get work package statuses (New, In Progress, Closed, etc.)
 - **Users**: List and get user information
 - **Time Entries**: Create and list time tracking entries
+- **Time Entry Activities**: List and get time entry activities (Development, Testing, etc.)
 
 ## Installation
 
@@ -207,6 +210,47 @@ List time entries with optional filtering and pagination.
 - `pageSize` (number, optional): Number of results per page (default: 20)
 - `offset` (number, optional): Offset for pagination (default: 1)
 
+### Work Package Types
+
+#### list_work_package_types
+List all work package types (e.g., Task, Bug, Feature) available in OpenProject.
+
+**Parameters**: None
+
+#### get_work_package_type
+Get details of a specific work package type.
+
+**Parameters**:
+- `id` (string, required): Work package type ID
+
+### Work Package Statuses
+
+#### list_work_package_statuses
+List all work package statuses (e.g., New, In Progress, Closed) available in OpenProject.
+
+**Parameters**: None
+
+#### get_work_package_status
+Get details of a specific work package status.
+
+**Parameters**:
+- `id` (string, required): Work package status ID
+
+### Time Entry Activities
+
+#### list_time_entry_activities
+List all time entry activities (e.g., Development, Testing, Documentation).
+
+**Parameters**:
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+#### get_time_entry_activity
+Get details of a specific time entry activity.
+
+**Parameters**:
+- `id` (string, required): Time entry activity ID
+
 ## Example Usage
 
 Once configured with Claude Desktop, you can ask Claude to:
@@ -218,6 +262,9 @@ Once configured with Claude Desktop, you can ask Claude to:
 - "Update work package 42 to set it as 50% complete"
 - "Log 3.5 hours of work on task 15 for today"
 - "List all users in the system"
+- "What work package types are available?"
+- "Show me all work package statuses"
+- "List all time entry activities"
 
 ## Development
 
