@@ -149,6 +149,30 @@ export interface Collection<T> {
   _links: HalLinks;
 }
 
+export interface BulkLoadOptions {
+  maxItems?: number;
+  includeEmbedded?: boolean;
+  pageSize?: number;
+}
+
+export interface ProjectStatistics {
+  totalWorkPackages: number;
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+  byAssignee: Record<string, number>;
+  completionPercentage: number;
+  overdueCount: number;
+  unassignedCount: number;
+}
+
+export interface ProjectOverview {
+  project: Project;
+  workPackages: WorkPackage[];
+  statistics: ProjectStatistics;
+  loadedAt: string;
+  totalCount: number;
+}
+
 export interface ErrorResponse {
   _type: string;
   errorIdentifier: string;

@@ -436,6 +436,42 @@ const tools: Tool[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'get_all_work_packages_in_project',
+    description: 'Load ALL work packages for a project in a single call (handles pagination automatically). Use this for comprehensive project analysis instead of manually paginating through list_work_packages.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: ['string', 'number'],
+          description: 'Project ID or identifier',
+        },
+        maxItems: {
+          type: 'number',
+          description: 'Maximum number of work packages to load (default: unlimited)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'get_project_overview',
+    description: 'Get comprehensive project overview including ALL work packages and statistics. Perfect for "big picture" analysis, gap identification, and executive summaries. Returns project details, all work packages, and computed statistics (completion %, overdue count, by status/type/assignee breakdowns).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: ['string', 'number'],
+          description: 'Project ID or identifier',
+        },
+        maxItems: {
+          type: 'number',
+          description: 'Maximum number of work packages to load (default: unlimited)',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -717,6 +753,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_time_entry_activity': {
         const result = await client.getTimeEntryActivity(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_all_work_packages_in_project': {
+        const result = await client.getAllWorkPackagesInProject(
+          args.projectId as string | number,
+          {
+            maxItems: args.maxItems as number | undefined,
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_project_overview': {
+        const result = await client.getProjectOverview(
+          args.projectId as string | number,
+          {
+            maxItems: args.maxItems as number | undefined,
+          }
+        );
         return {
           content: [
             {

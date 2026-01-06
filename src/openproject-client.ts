@@ -9,6 +9,9 @@ import type {
   TimeEntryActivity,
   Collection,
   ErrorResponse,
+  BulkLoadOptions,
+  ProjectOverview,
+  ProjectStatistics,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -61,6 +64,33 @@ export class OpenProjectClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  private async fetchAllPages<T>(
+    fetchPage: (offset: number, pageSize: number) => Promise<Collection<T>>,
+    options?: BulkLoadOptions
+  ): Promise<T[]> {
+    const maxItems = options?.maxItems || Infinity;
+    const pageSize = Math.min(options?.pageSize || 100, 100); // OpenProject max is 100
+    const allItems: T[] = [];
+    let offset = 1;
+    let hasMore = true;
+
+    while (hasMore && allItems.length < maxItems) {
+      const collection = await fetchPage(offset, pageSize);
+      allItems.push(...collection._embedded.elements);
+
+      // Check if there are more pages
+      hasMore = collection.total > allItems.length;
+      offset += pageSize;
+
+      // Respect maxItems limit
+      if (allItems.length >= maxItems) {
+        return allItems.slice(0, maxItems);
+      }
+    }
+
+    return allItems;
   }
 
   async listProjects(params?: {
@@ -369,5 +399,102 @@ export class OpenProjectClient {
 
   async getTimeEntryActivity(id: string): Promise<TimeEntryActivity> {
     return this.request<TimeEntryActivity>(`/time_entries/activities/${id}`);
+  }
+
+  async getAllWorkPackagesInProject(
+    projectId: string | number,
+    options?: BulkLoadOptions
+  ): Promise<WorkPackage[]> {
+    const fetchPage = async (offset: number, pageSize: number) => {
+      const queryParams = new URLSearchParams();
+      queryParams.set('pageSize', pageSize.toString());
+      queryParams.set('offset', offset.toString());
+
+      // Filter by project
+      const filter = `[{"project":{"operator":"=","values":["${projectId}"]}}]`;
+      queryParams.set('filters', filter);
+
+      const query = queryParams.toString();
+      return this.request<Collection<WorkPackage>>(
+        `/work_packages${query ? '?' + query : ''}`
+      );
+    };
+
+    return this.fetchAllPages<WorkPackage>(fetchPage, options);
+  }
+
+  async getProjectOverview(
+    projectId: string | number,
+    options?: BulkLoadOptions
+  ): Promise<ProjectOverview> {
+    // Load project and all work packages in parallel
+    const [project, workPackages] = await Promise.all([
+      this.getProject(projectId.toString()),
+      this.getAllWorkPackagesInProject(projectId, options),
+    ]);
+
+    // Calculate statistics
+    const statistics = this.calculateProjectStatistics(workPackages);
+
+    return {
+      project,
+      workPackages,
+      statistics,
+      loadedAt: new Date().toISOString(),
+      totalCount: workPackages.length,
+    };
+  }
+
+  private calculateProjectStatistics(workPackages: WorkPackage[]): ProjectStatistics {
+    const statistics: ProjectStatistics = {
+      totalWorkPackages: workPackages.length,
+      byStatus: {},
+      byType: {},
+      byAssignee: {},
+      completionPercentage: 0,
+      overdueCount: 0,
+      unassignedCount: 0,
+    };
+
+    let totalPercentage = 0;
+    const now = new Date();
+
+    for (const wp of workPackages) {
+      // Count by status
+      const statusName = wp._embedded?.status?.name || 'Unknown';
+      statistics.byStatus[statusName] = (statistics.byStatus[statusName] || 0) + 1;
+
+      // Count by type
+      const typeName = wp._embedded?.type?.name || 'Unknown';
+      statistics.byType[typeName] = (statistics.byType[typeName] || 0) + 1;
+
+      // Count by assignee
+      const assigneeName = wp._embedded?.assignee?.name || 'Unassigned';
+      statistics.byAssignee[assigneeName] = (statistics.byAssignee[assigneeName] || 0) + 1;
+
+      // Count unassigned
+      if (!wp._embedded?.assignee) {
+        statistics.unassignedCount++;
+      }
+
+      // Sum completion percentage
+      totalPercentage += wp.percentageDone || 0;
+
+      // Count overdue
+      if (wp.dueDate) {
+        const dueDate = new Date(wp.dueDate);
+        const isClosed = wp._embedded?.status?.isClosed || false;
+        if (dueDate < now && !isClosed) {
+          statistics.overdueCount++;
+        }
+      }
+    }
+
+    // Calculate average completion
+    if (workPackages.length > 0) {
+      statistics.completionPercentage = Math.round(totalPercentage / workPackages.length);
+    }
+
+    return statistics;
   }
 }

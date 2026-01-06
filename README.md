@@ -251,6 +251,42 @@ Get details of a specific time entry activity.
 **Parameters**:
 - `id` (string, required): Time entry activity ID
 
+### Bulk Operations & Analytics
+
+#### get_all_work_packages_in_project
+Load ALL work packages for a project in a single call (handles pagination automatically).
+
+**Use this instead of manually paginating through `list_work_packages` for comprehensive project analysis.**
+
+**Parameters**:
+- `projectId` (string|number, required): Project ID or identifier
+- `maxItems` (number, optional): Maximum number of work packages to load (default: unlimited)
+
+**Returns**: Array of all work packages in the project
+
+#### get_project_overview
+Get comprehensive project overview including ALL work packages and statistics.
+
+**Perfect for "big picture" analysis, gap identification, and executive summaries.**
+
+**Parameters**:
+- `projectId` (string|number, required): Project ID or identifier
+- `maxItems` (number, optional): Maximum number of work packages to load (default: unlimited)
+
+**Returns**: Object containing:
+- `project`: Full project details
+- `workPackages`: Array of all work packages
+- `statistics`: Computed project statistics including:
+  - Total work packages
+  - Breakdown by status (New, In Progress, Closed, etc.)
+  - Breakdown by type (Task, Bug, Feature, etc.)
+  - Breakdown by assignee
+  - Completion percentage (average)
+  - Overdue count
+  - Unassigned count
+- `loadedAt`: Timestamp when data was loaded
+- `totalCount`: Total number of work packages loaded
+
 ## Example Usage
 
 Once configured with Claude Desktop, you can ask Claude to:
@@ -265,6 +301,17 @@ Once configured with Claude Desktop, you can ask Claude to:
 - "What work package types are available?"
 - "Show me all work package statuses"
 - "List all time entry activities"
+
+### Advanced Analytical Tasks (NEW - Bulk Operations)
+
+With the new bulk loading and analytics tools, you can now ask Claude for high-level insights:
+
+- "Give me an executive summary of the 'Website Redesign' project"
+- "What's the overall status of project 5? How many tasks are complete?"
+- "Show me all work packages in project 3 and identify any gaps in planning"
+- "Which team members have the most assigned tasks in project 2?"
+- "What percentage of tasks are overdue in the Q1 Launch project?"
+- "Load all work packages for project 'mobile-app' and analyze the workload distribution"
 
 ## Development
 
