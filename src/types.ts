@@ -98,6 +98,10 @@ export interface WorkPackage {
     assignee?: User;
     author?: User;
   };
+  // Custom fields: OpenProject allows organization-specific custom fields
+  // These appear as additional properties on the work package (e.g., customField1, customField2, etc.)
+  // or with custom names defined by the organization
+  [key: string]: unknown;
 }
 
 export interface User {

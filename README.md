@@ -177,6 +177,8 @@ Delete a work package.
 **Parameters**:
 - `id` (string, required): Work package ID
 
+**Note on Custom Fields**: All work package tools automatically include any custom fields defined in your OpenProject instance. Custom fields appear as additional properties on work package objects and can be accessed directly. This allows Claude to work with organization-specific data like custom priority levels, risk assessments, or other domain-specific metadata.
+
 ### Users
 
 #### list_users
@@ -395,13 +397,20 @@ With the new bulk loading, analytics, relationship, and activity tools, you can 
 - "Show me all relationships for task #50 to understand its dependencies"
 - "Is there a critical path issue in the project? Which tasks are blocking others?"
 
-**Activity History & Team Collaboration (NEW):**
+**Activity History & Team Collaboration:**
 - "What comments have been made on work package #25?"
 - "Show me the full change history for task #42"
 - "What discussions happened around the 'Authentication Bug' work package?"
 - "Who has been commenting on the high-priority tasks?"
 - "Summarize the team discussion on work package #15"
 - "What decisions were made in the comments on task #30?"
+
+**Custom Fields & Organization-Specific Data (NEW):**
+- "Show me all tasks with high business priority (custom field)"
+- "Which work packages have a risk level of 'critical'?"
+- "Analyze work packages by custom priority field"
+- "Filter tasks by our custom 'Department' field"
+- Custom fields are automatically available in all work package data - no special configuration needed
 
 ## Development
 
