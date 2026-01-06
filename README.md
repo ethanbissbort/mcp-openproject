@@ -9,6 +9,7 @@ This MCP server provides tools to:
 - **Projects**: List, get, create, and update projects
 - **Work Packages**: List, get, create, update, and delete work packages (tasks/issues)
 - **Work Package Relationships**: Access dependencies, hierarchies, and blocking relationships
+- **Work Package Activities & Comments**: Access activity history, comments, and change logs
 - **Work Package Types**: List and get work package types (Task, Bug, Feature, etc.)
 - **Work Package Statuses**: List and get work package statuses (New, In Progress, Closed, etc.)
 - **Users**: List and get user information
@@ -330,6 +331,35 @@ Find all work packages that are blocking a specific work package.
 
 **Returns**: Array of work packages that are blocking the specified work package
 
+### Work Package Activities & Comments
+
+#### list_work_package_activities
+Get all activities for a work package including comments, status changes, field updates, and relationship changes.
+
+**Essential for understanding the full history and context of discussions around a work package.**
+
+**Parameters**:
+- `workPackageId` (string|number, required): Work package ID
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+**Returns**: Collection of activities with:
+- Activity type (comment, status change, field update, etc.)
+- User who performed the activity
+- Timestamp (createdAt)
+- Comment content (if applicable)
+- Change details (what changed from/to)
+
+#### get_work_package_comments
+Get all comments for a work package, filtering out change history noise.
+
+**Quick way to read team discussions without seeing every field change.**
+
+**Parameters**:
+- `workPackageId` (string|number, required): Work package ID
+
+**Returns**: Array of activities containing only those with comment content
+
 ## Example Usage
 
 Once configured with Claude Desktop, you can ask Claude to:
@@ -345,9 +375,9 @@ Once configured with Claude Desktop, you can ask Claude to:
 - "Show me all work package statuses"
 - "List all time entry activities"
 
-### Advanced Analytical Tasks (NEW - Bulk Operations & Relationships)
+### Advanced Analytical Tasks (NEW - Bulk Operations, Relationships & History)
 
-With the new bulk loading, analytics, and relationship tools, you can now ask Claude for high-level insights:
+With the new bulk loading, analytics, relationship, and activity tools, you can now ask Claude for high-level insights:
 
 **Project Overview & Analytics:**
 - "Give me an executive summary of the 'Website Redesign' project"
@@ -357,13 +387,21 @@ With the new bulk loading, analytics, and relationship tools, you can now ask Cl
 - "What percentage of tasks are overdue in the Q1 Launch project?"
 - "Load all work packages for project 'mobile-app' and analyze the workload distribution"
 
-**Dependency Analysis & Risk Management (NEW):**
+**Dependency Analysis & Risk Management:**
 - "What work packages are blocking task #42?"
 - "Show me the full hierarchy of work package #15"
 - "Find all blockers for the 'User Authentication' feature"
 - "What tasks are dependent on completing work package #28?"
 - "Show me all relationships for task #50 to understand its dependencies"
 - "Is there a critical path issue in the project? Which tasks are blocking others?"
+
+**Activity History & Team Collaboration (NEW):**
+- "What comments have been made on work package #25?"
+- "Show me the full change history for task #42"
+- "What discussions happened around the 'Authentication Bug' work package?"
+- "Who has been commenting on the high-priority tasks?"
+- "Summarize the team discussion on work package #15"
+- "What decisions were made in the comments on task #30?"
 
 ## Development
 

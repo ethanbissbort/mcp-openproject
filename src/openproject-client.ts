@@ -14,6 +14,7 @@ import type {
   ProjectStatistics,
   Relation,
   WorkPackageHierarchy,
+  Activity,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -630,6 +631,33 @@ export class OpenProjectClient {
 
     return Promise.all(
       blockedIds.map((id) => this.getWorkPackage(id))
+    );
+  }
+
+  // Activity and Comment Methods
+
+  async listWorkPackageActivities(
+    workPackageId: string | number,
+    options?: {
+      pageSize?: number;
+      offset?: number;
+    }
+  ): Promise<Collection<Activity>> {
+    const params = new URLSearchParams({
+      pageSize: (options?.pageSize || 20).toString(),
+      offset: (options?.offset || 1).toString(),
+    });
+
+    return this.request<Collection<Activity>>(
+      `/api/v3/work_packages/${workPackageId}/activities?${params}`
+    );
+  }
+
+  async getWorkPackageComments(workPackageId: string | number): Promise<Activity[]> {
+    // Get all activities and filter to only those with comments
+    const activities = await this.listWorkPackageActivities(workPackageId, { pageSize: 100 });
+    return activities._embedded.elements.filter(
+      (activity) => activity.comment && activity.comment.raw
     );
   }
 }

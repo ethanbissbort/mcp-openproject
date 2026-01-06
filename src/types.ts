@@ -213,6 +213,37 @@ export interface WorkPackageHierarchy {
   relations: Relation[];
 }
 
+export interface ActivityDetail {
+  format: string;
+  raw: string;
+  html: string;
+}
+
+export interface Activity {
+  _type: string;
+  id: number;
+  version: number;
+  comment?: {
+    format: string;
+    raw: string;
+    html: string;
+  };
+  details: Array<{
+    format: string;
+    raw: string;
+    html: string;
+  }>;
+  createdAt: string;
+  _links: HalLinks & {
+    user?: HalLink;
+    workPackage?: HalLink;
+  };
+  _embedded?: {
+    user?: User;
+    workPackage?: WorkPackage;
+  };
+}
+
 export interface ErrorResponse {
   _type: string;
   errorIdentifier: string;

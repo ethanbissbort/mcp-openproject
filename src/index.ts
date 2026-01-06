@@ -518,6 +518,42 @@ const tools: Tool[] = [
       required: ['workPackageId'],
     },
   },
+  {
+    name: 'list_work_package_activities',
+    description: 'Get all activities for a work package including comments, status changes, field updates, and relationship changes. Returns chronological activity log.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+        pageSize: {
+          type: 'number',
+          description: 'Number of results per page (default: 20)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Offset for pagination (default: 1)',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
+  {
+    name: 'get_work_package_comments',
+    description: 'Get all comments for a work package. Filters activities to only return those with comment content, excluding change history noise.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -872,6 +908,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'find_blocking_work_packages': {
         const result = await client.getAllBlockingRelations(args.workPackageId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_work_package_activities': {
+        const result = await client.listWorkPackageActivities(
+          args.workPackageId as string | number,
+          {
+            pageSize: args.pageSize as number | undefined,
+            offset: args.offset as number | undefined,
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_comments': {
+        const result = await client.getWorkPackageComments(args.workPackageId as string | number);
         return {
           content: [
             {
