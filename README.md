@@ -1,1 +1,245 @@
-# mcp-openproject
+# MCP OpenProject Connector
+
+A Model Context Protocol (MCP) server that provides integration with OpenProject, enabling AI assistants to interact with your OpenProject instance for project management, work package tracking, time entries, and more.
+
+## Features
+
+This MCP server provides tools to:
+
+- **Projects**: List, get, create, and update projects
+- **Work Packages**: List, get, create, update, and delete work packages (tasks/issues)
+- **Users**: List and get user information
+- **Time Entries**: Create and list time tracking entries
+
+## Installation
+
+1. Clone this repository:
+```bash
+git clone <repository-url>
+cd mcp-openproject
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Build the project:
+```bash
+npm run build
+```
+
+## Configuration
+
+1. Create a `.env` file based on `.env.example`:
+```bash
+cp .env.example .env
+```
+
+2. Configure your OpenProject credentials:
+```env
+OPENPROJECT_URL=https://your-openproject-instance.com
+OPENPROJECT_API_KEY=your_api_key_here
+```
+
+### Getting Your API Key
+
+1. Log in to your OpenProject instance
+2. Go to your account settings (click your avatar → "My account")
+3. Navigate to "Access tokens"
+4. Create a new API access token
+5. Copy the token and add it to your `.env` file
+
+## Usage
+
+### Running the Server
+
+Start the MCP server:
+```bash
+npm start
+```
+
+Or run in development mode with auto-rebuild:
+```bash
+npm run dev
+```
+
+### Configuring with Claude Desktop
+
+Add the server to your Claude Desktop configuration file:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "openproject": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-openproject/dist/index.js"],
+      "env": {
+        "OPENPROJECT_URL": "https://your-openproject-instance.com",
+        "OPENPROJECT_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+## Available Tools
+
+### Projects
+
+#### list_projects
+List all projects in OpenProject with optional filtering and pagination.
+
+**Parameters**:
+- `filters` (string, optional): JSON filters for the query
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+#### get_project
+Get details of a specific project.
+
+**Parameters**:
+- `id` (string, required): Project ID or identifier
+
+#### create_project
+Create a new project.
+
+**Parameters**:
+- `name` (string, required): Project name
+- `identifier` (string, required): Project identifier (unique, lowercase, no spaces)
+- `description` (string, optional): Project description (supports markdown)
+- `public` (boolean, optional): Whether the project is public (default: false)
+- `parentId` (number, optional): Parent project ID for subprojects
+
+#### update_project
+Update an existing project.
+
+**Parameters**:
+- `id` (string, required): Project ID or identifier
+- `name` (string, optional): New project name
+- `description` (string, optional): New description (supports markdown)
+- `public` (boolean, optional): Whether the project is public
+- `active` (boolean, optional): Whether the project is active
+
+### Work Packages
+
+#### list_work_packages
+List work packages (tasks/issues) with optional filtering and pagination.
+
+**Parameters**:
+- `filters` (string, optional): JSON filters (e.g., for open items: `[{"status":{"operator":"o","values":[]}}]`)
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+#### get_work_package
+Get details of a specific work package.
+
+**Parameters**:
+- `id` (string, required): Work package ID
+
+#### create_work_package
+Create a new work package (task/issue).
+
+**Parameters**:
+- `subject` (string, required): Work package subject/title
+- `projectId` (number, required): Project ID
+- `typeId` (number, optional): Work package type ID
+- `description` (string, optional): Description (supports markdown)
+- `assigneeId` (number, optional): User ID of assignee
+- `startDate` (string, optional): Start date (YYYY-MM-DD format)
+- `dueDate` (string, optional): Due date (YYYY-MM-DD format)
+
+#### update_work_package
+Update an existing work package.
+
+**Parameters**:
+- `id` (string, required): Work package ID
+- `subject` (string, optional): New subject/title
+- `description` (string, optional): New description (supports markdown)
+- `assigneeId` (number, optional): New assignee user ID
+- `startDate` (string, optional): Start date (YYYY-MM-DD format)
+- `dueDate` (string, optional): Due date (YYYY-MM-DD format)
+- `statusId` (number, optional): Status ID
+- `percentageDone` (number, optional): Percentage done (0-100)
+
+#### delete_work_package
+Delete a work package.
+
+**Parameters**:
+- `id` (string, required): Work package ID
+
+### Users
+
+#### list_users
+List users with optional filtering and pagination.
+
+**Parameters**:
+- `filters` (string, optional): JSON filters for the query
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+#### get_user
+Get details of a specific user.
+
+**Parameters**:
+- `id` (string, required): User ID
+
+### Time Entries
+
+#### create_time_entry
+Create a time entry for a work package.
+
+**Parameters**:
+- `workPackageId` (number, required): Work package ID
+- `hours` (number, required): Hours spent (e.g., 2.5 for 2.5 hours)
+- `spentOn` (string, required): Date when time was spent (YYYY-MM-DD format)
+- `activityId` (number, optional): Activity ID
+- `comment` (string, optional): Comment about the time entry (supports markdown)
+
+#### list_time_entries
+List time entries with optional filtering and pagination.
+
+**Parameters**:
+- `filters` (string, optional): JSON filters for the query
+- `pageSize` (number, optional): Number of results per page (default: 20)
+- `offset` (number, optional): Offset for pagination (default: 1)
+
+## Example Usage
+
+Once configured with Claude Desktop, you can ask Claude to:
+
+- "List all active projects in OpenProject"
+- "Create a new project called 'Website Redesign' with identifier 'web-redesign'"
+- "Show me all open work packages in project 5"
+- "Create a new task in project 3 with subject 'Fix login bug'"
+- "Update work package 42 to set it as 50% complete"
+- "Log 3.5 hours of work on task 15 for today"
+- "List all users in the system"
+
+## Development
+
+### Building
+
+```bash
+npm run build
+```
+
+### Watch Mode
+
+For development with auto-rebuild on file changes:
+```bash
+npm run watch
+```
+
+## API Documentation
+
+This connector uses the OpenProject API v3. For more information about the API:
+- [OpenProject API Documentation](https://www.openproject.org/docs/api/)
+- [API Introduction](https://www.openproject.org/docs/api/introduction/)
+
+## License
+
+MIT
