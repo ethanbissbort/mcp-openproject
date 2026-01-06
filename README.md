@@ -8,11 +8,13 @@ This MCP server provides tools to:
 
 - **Projects**: List, get, create, and update projects
 - **Work Packages**: List, get, create, update, and delete work packages (tasks/issues)
+- **Work Package Relationships**: Access dependencies, hierarchies, and blocking relationships
 - **Work Package Types**: List and get work package types (Task, Bug, Feature, etc.)
 - **Work Package Statuses**: List and get work package statuses (New, In Progress, Closed, etc.)
 - **Users**: List and get user information
 - **Time Entries**: Create and list time tracking entries
 - **Time Entry Activities**: List and get time entry activities (Development, Testing, etc.)
+- **Bulk Operations & Analytics**: Load entire projects with statistics for comprehensive analysis
 
 ## Installation
 
@@ -287,6 +289,47 @@ Get comprehensive project overview including ALL work packages and statistics.
 - `loadedAt`: Timestamp when data was loaded
 - `totalCount`: Total number of work packages loaded
 
+### Work Package Relationships & Dependencies
+
+#### get_work_package_relations
+Get all relationships for a work package (blocks, blocked by, parent, children, relates to, etc.).
+
+**Essential for understanding dependencies and identifying blockers in your project.**
+
+**Parameters**:
+- `workPackageId` (string|number, required): Work package ID
+
+**Returns**: Collection of relations with details about:
+- Relation type (blocks, blocked, precedes, follows, relates, duplicates, parent, children)
+- Source and target work packages
+- Relation metadata
+
+#### get_work_package_hierarchy
+Get the complete parent-child hierarchy tree for a work package.
+
+**Perfect for understanding the full context of a task within its epic/feature/story hierarchy.**
+
+**Parameters**:
+- `workPackageId` (string|number, required): Work package ID
+- `maxDepth` (number, optional): Maximum depth to traverse (default: 10)
+
+**Returns**: Hierarchical structure containing:
+- `workPackage`: The target work package
+- `parent`: Parent work package hierarchy (if exists)
+- `children`: Array of child work package hierarchies
+- `depth`: Current depth in the hierarchy
+- `relations`: All relations for this work package
+
+#### find_blocking_work_packages
+Find all work packages that are blocking a specific work package.
+
+**Quick way to identify what needs to be completed before a task can proceed.**
+
+**Parameters**:
+- `workPackageId` (string|number, required): Work package ID
+
+**Returns**: Array of work packages that are blocking the specified work package
+
 ## Example Usage
 
 Once configured with Claude Desktop, you can ask Claude to:
@@ -302,16 +345,25 @@ Once configured with Claude Desktop, you can ask Claude to:
 - "Show me all work package statuses"
 - "List all time entry activities"
 
-### Advanced Analytical Tasks (NEW - Bulk Operations)
+### Advanced Analytical Tasks (NEW - Bulk Operations & Relationships)
 
-With the new bulk loading and analytics tools, you can now ask Claude for high-level insights:
+With the new bulk loading, analytics, and relationship tools, you can now ask Claude for high-level insights:
 
+**Project Overview & Analytics:**
 - "Give me an executive summary of the 'Website Redesign' project"
 - "What's the overall status of project 5? How many tasks are complete?"
 - "Show me all work packages in project 3 and identify any gaps in planning"
 - "Which team members have the most assigned tasks in project 2?"
 - "What percentage of tasks are overdue in the Q1 Launch project?"
 - "Load all work packages for project 'mobile-app' and analyze the workload distribution"
+
+**Dependency Analysis & Risk Management (NEW):**
+- "What work packages are blocking task #42?"
+- "Show me the full hierarchy of work package #15"
+- "Find all blockers for the 'User Authentication' feature"
+- "What tasks are dependent on completing work package #28?"
+- "Show me all relationships for task #50 to understand its dependencies"
+- "Is there a critical path issue in the project? Which tasks are blocking others?"
 
 ## Development
 

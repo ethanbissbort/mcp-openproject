@@ -12,6 +12,8 @@ import type {
   BulkLoadOptions,
   ProjectOverview,
   ProjectStatistics,
+  Relation,
+  WorkPackageHierarchy,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -496,5 +498,138 @@ export class OpenProjectClient {
     }
 
     return statistics;
+  }
+
+  async getWorkPackageRelations(workPackageId: string | number): Promise<Collection<Relation>> {
+    return this.request<Collection<Relation>>(
+      `/work_packages/${workPackageId}/relations`
+    );
+  }
+
+  async getWorkPackageChildren(workPackageId: string | number): Promise<WorkPackage[]> {
+    const relations = await this.getWorkPackageRelations(workPackageId);
+    const childRelations = relations._embedded.elements.filter(
+      (rel) => rel.type === 'children'
+    );
+
+    // Load child work packages
+    const childIds = childRelations.map((rel) => {
+      const href = rel._links.to.href;
+      return href.split('/').pop() || '';
+    });
+
+    const children = await Promise.all(
+      childIds.filter(id => id).map((id) => this.getWorkPackage(id))
+    );
+
+    return children;
+  }
+
+  async getWorkPackageParent(workPackageId: string | number): Promise<WorkPackage | null> {
+    const relations = await this.getWorkPackageRelations(workPackageId);
+    const parentRelation = relations._embedded.elements.find(
+      (rel) => rel.type === 'parent'
+    );
+
+    if (!parentRelation) {
+      return null;
+    }
+
+    const href = parentRelation._links.to.href;
+    const parentId = href.split('/').pop();
+
+    if (!parentId) {
+      return null;
+    }
+
+    return this.getWorkPackage(parentId);
+  }
+
+  async getWorkPackageHierarchy(
+    workPackageId: string | number,
+    maxDepth: number = 10,
+    currentDepth: number = 0
+  ): Promise<WorkPackageHierarchy> {
+    // Load the work package and its relations
+    const [workPackage, relationsCollection] = await Promise.all([
+      this.getWorkPackage(workPackageId.toString()),
+      this.getWorkPackageRelations(workPackageId),
+    ]);
+
+    const relations = relationsCollection._embedded.elements;
+    const hierarchy: WorkPackageHierarchy = {
+      workPackage,
+      children: [],
+      depth: currentDepth,
+      relations,
+    };
+
+    // Stop recursion at max depth
+    if (currentDepth >= maxDepth) {
+      return hierarchy;
+    }
+
+    // Load parent if exists
+    const parentRelation = relations.find((rel) => rel.type === 'parent');
+    if (parentRelation) {
+      const href = parentRelation._links.to.href;
+      const parentId = href.split('/').pop();
+      if (parentId) {
+        hierarchy.parent = await this.getWorkPackageHierarchy(
+          parentId,
+          maxDepth,
+          currentDepth + 1
+        );
+      }
+    }
+
+    // Load children
+    const childRelations = relations.filter((rel) => rel.type === 'children');
+    const childIds = childRelations.map((rel) => {
+      const href = rel._links.to.href;
+      return href.split('/').pop() || '';
+    }).filter(id => id);
+
+    hierarchy.children = await Promise.all(
+      childIds.map((id) =>
+        this.getWorkPackageHierarchy(id, maxDepth, currentDepth + 1)
+      )
+    );
+
+    return hierarchy;
+  }
+
+  async getAllBlockingRelations(workPackageId: string | number): Promise<WorkPackage[]> {
+    const relations = await this.getWorkPackageRelations(workPackageId);
+    const blockingRelations = relations._embedded.elements.filter(
+      (rel) => rel.type === 'blocked'
+    );
+
+    // Load blocking work packages
+    const blockingIds = blockingRelations.map((rel) => {
+      const href = rel._links.to.href;
+      return href.split('/').pop() || '';
+    }).filter(id => id);
+
+    return Promise.all(
+      blockingIds.map((id) => this.getWorkPackage(id))
+    );
+  }
+
+  async getAllBlockedRelations(workPackageId: string | number): Promise<WorkPackage[]> {
+    const relations = await this.getWorkPackageRelations(workPackageId);
+    const blockedRelations = relations._embedded.elements.filter(
+      (rel) => rel.type === 'blocks'
+    );
+
+    // Load blocked work packages
+    const blockedIds = blockedRelations.map((rel) => {
+      const href = rel._links.to.href;
+      return href.split('/').pop() || '';
+    }).filter(id => id);
+
+    return Promise.all(
+      blockedIds.map((id) => this.getWorkPackage(id))
+    );
   }
 }

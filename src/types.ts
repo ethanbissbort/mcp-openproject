@@ -163,6 +163,9 @@ export interface ProjectStatistics {
   completionPercentage: number;
   overdueCount: number;
   unassignedCount: number;
+  blockedCount?: number;
+  blockingCount?: number;
+  orphanedCount?: number;
 }
 
 export interface ProjectOverview {
@@ -171,6 +174,43 @@ export interface ProjectOverview {
   statistics: ProjectStatistics;
   loadedAt: string;
   totalCount: number;
+}
+
+export type RelationType =
+  | 'blocks'
+  | 'blocked'
+  | 'precedes'
+  | 'follows'
+  | 'relates'
+  | 'duplicates'
+  | 'duplicated'
+  | 'parent'
+  | 'children';
+
+export interface Relation {
+  _type: string;
+  id: number;
+  name?: string;
+  type: RelationType;
+  reverseType?: string;
+  description?: string;
+  _links: {
+    self: HalLink;
+    from: HalLink;
+    to: HalLink;
+  };
+  _embedded?: {
+    from?: WorkPackage;
+    to?: WorkPackage;
+  };
+}
+
+export interface WorkPackageHierarchy {
+  workPackage: WorkPackage;
+  parent?: WorkPackageHierarchy;
+  children: WorkPackageHierarchy[];
+  depth: number;
+  relations: Relation[];
 }
 
 export interface ErrorResponse {

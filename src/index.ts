@@ -472,6 +472,52 @@ const tools: Tool[] = [
       required: ['projectId'],
     },
   },
+  {
+    name: 'get_work_package_relations',
+    description: 'Get all relationships for a work package (blocks, blocked by, parent, children, relates to, etc.). Essential for understanding dependencies and identifying blockers.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
+  {
+    name: 'get_work_package_hierarchy',
+    description: 'Get the complete parent-child hierarchy tree for a work package. Shows parent, all children, grandchildren, etc. Perfect for understanding project structure and work breakdown.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+        maxDepth: {
+          type: 'number',
+          description: 'Maximum depth to traverse (default: 10)',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
+  {
+    name: 'find_blocking_work_packages',
+    description: 'Find all work packages that are blocking a specific work package. Quick way to identify what needs to be completed before this work package can proceed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -787,6 +833,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             maxItems: args.maxItems as number | undefined,
           }
         );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_relations': {
+        const result = await client.getWorkPackageRelations(args.workPackageId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_hierarchy': {
+        const result = await client.getWorkPackageHierarchy(
+          args.workPackageId as string | number,
+          args.maxDepth as number | undefined
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'find_blocking_work_packages': {
+        const result = await client.getAllBlockingRelations(args.workPackageId as string | number);
         return {
           content: [
             {
