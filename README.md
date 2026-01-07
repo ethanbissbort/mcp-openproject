@@ -2,6 +2,22 @@
 
 A Model Context Protocol (MCP) server that provides integration with OpenProject, enabling AI assistants to interact with your OpenProject instance for project management, work package tracking, time entries, and more.
 
+## 🎯 Capabilities Status
+
+**Current Status**: ✅ **Phase 1 Complete - Agentic Foundation Ready**
+
+This connector now provides comprehensive data access enabling Claude to perform:
+- ✅ **Strategic Analysis** - Load and analyze entire project contexts
+- ✅ **Dependency Mapping** - Understand work package relationships and hierarchies
+- ✅ **Team Collaboration Insights** - Access discussions and change history
+- ✅ **Custom Field Support** - Work with organization-specific metadata
+- ✅ **Executive Summaries** - Generate project overviews with statistics
+- ✅ **Gap Identification** - Identify blockers and critical path issues
+
+**Total MCP Tools**: 27 comprehensive tools for project management
+
+**Development Status**: See [ROADMAP.md](./ROADMAP.md) for detailed progress and upcoming features.
+
 ## Features
 
 This MCP server provides tools to:
