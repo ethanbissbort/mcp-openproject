@@ -96,6 +96,30 @@ export class OpenProjectClient {
     return allItems;
   }
 
+  /**
+   * Safely extract ID from OpenProject HAL+JSON href URL
+   * @param href - The href string from _links
+   * @returns The extracted ID or null if invalid
+   */
+  private extractIdFromHref(href: string): string | null {
+    if (!href || typeof href !== 'string') {
+      return null;
+    }
+
+    try {
+      // Handle both absolute and relative URLs
+      const url = href.startsWith('http') ? new URL(href) : new URL(href, 'http://dummy.local');
+      const segments = url.pathname.split('/').filter(Boolean);
+      const id = segments[segments.length - 1];
+
+      // Validate that ID looks reasonable (numeric or alphanumeric)
+      return id && id.length > 0 ? id : null;
+    } catch (error) {
+      console.warn(`Failed to extract ID from href: ${href}`, error);
+      return null;
+    }
+  }
+
   async listProjects(params?: {
     filters?: string;
     pageSize?: number;
@@ -413,8 +437,13 @@ export class OpenProjectClient {
       queryParams.set('pageSize', pageSize.toString());
       queryParams.set('offset', offset.toString());
 
-      // Filter by project
-      const filter = `[{"project":{"operator":"=","values":["${projectId}"]}}]`;
+      // Filter by project using proper JSON serialization to prevent injection
+      const filter = JSON.stringify([{
+        project: {
+          operator: "=",
+          values: [projectId.toString()]
+        }
+      }]);
       queryParams.set('filters', filter);
 
       const query = queryParams.toString();
@@ -514,13 +543,12 @@ export class OpenProjectClient {
     );
 
     // Load child work packages
-    const childIds = childRelations.map((rel) => {
-      const href = rel._links.to.href;
-      return href.split('/').pop() || '';
-    });
+    const childIds = childRelations
+      .map((rel) => this.extractIdFromHref(rel._links.to.href))
+      .filter((id): id is string => id !== null);
 
     const children = await Promise.all(
-      childIds.filter(id => id).map((id) => this.getWorkPackage(id))
+      childIds.map((id) => this.getWorkPackage(id))
     );
 
     return children;
@@ -536,8 +564,7 @@ export class OpenProjectClient {
       return null;
     }
 
-    const href = parentRelation._links.to.href;
-    const parentId = href.split('/').pop();
+    const parentId = this.extractIdFromHref(parentRelation._links.to.href);
 
     if (!parentId) {
       return null;
@@ -573,8 +600,7 @@ export class OpenProjectClient {
     // Load parent if exists
     const parentRelation = relations.find((rel) => rel.type === 'parent');
     if (parentRelation) {
-      const href = parentRelation._links.to.href;
-      const parentId = href.split('/').pop();
+      const parentId = this.extractIdFromHref(parentRelation._links.to.href);
       if (parentId) {
         hierarchy.parent = await this.getWorkPackageHierarchy(
           parentId,
@@ -586,10 +612,9 @@ export class OpenProjectClient {
 
     // Load children
     const childRelations = relations.filter((rel) => rel.type === 'children');
-    const childIds = childRelations.map((rel) => {
-      const href = rel._links.to.href;
-      return href.split('/').pop() || '';
-    }).filter(id => id);
+    const childIds = childRelations
+      .map((rel) => this.extractIdFromHref(rel._links.to.href))
+      .filter((id): id is string => id !== null);
 
     hierarchy.children = await Promise.all(
       childIds.map((id) =>
@@ -607,10 +632,9 @@ export class OpenProjectClient {
     );
 
     // Load blocking work packages
-    const blockingIds = blockingRelations.map((rel) => {
-      const href = rel._links.to.href;
-      return href.split('/').pop() || '';
-    }).filter(id => id);
+    const blockingIds = blockingRelations
+      .map((rel) => this.extractIdFromHref(rel._links.to.href))
+      .filter((id): id is string => id !== null);
 
     return Promise.all(
       blockingIds.map((id) => this.getWorkPackage(id))
@@ -624,10 +648,9 @@ export class OpenProjectClient {
     );
 
     // Load blocked work packages
-    const blockedIds = blockedRelations.map((rel) => {
-      const href = rel._links.to.href;
-      return href.split('/').pop() || '';
-    }).filter(id => id);
+    const blockedIds = blockedRelations
+      .map((rel) => this.extractIdFromHref(rel._links.to.href))
+      .filter((id): id is string => id !== null);
 
     return Promise.all(
       blockedIds.map((id) => this.getWorkPackage(id))
