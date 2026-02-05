@@ -183,7 +183,7 @@ const tools: Tool[] = [
   },
   {
     name: 'create_work_package',
-    description: 'Create a new work package (task/issue) in OpenProject',
+    description: 'Create a new work package (task/issue) in OpenProject. Supports setting a parent to create task hierarchies (e.g., create a parent epic, then create child tasks with parentId pointing to the epic).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -207,6 +207,10 @@ const tools: Tool[] = [
           type: 'number',
           description: 'User ID of assignee',
         },
+        parentId: {
+          type: 'number',
+          description: 'Parent work package ID. Use this to create subtasks/child work packages under a parent task, epic, or feature.',
+        },
         startDate: {
           type: 'string',
           description: 'Start date (YYYY-MM-DD format)',
@@ -221,7 +225,7 @@ const tools: Tool[] = [
   },
   {
     name: 'update_work_package',
-    description: 'Update an existing work package',
+    description: 'Update an existing work package. Supports re-parenting (moving a work package under a different parent) or removing from a parent.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -240,6 +244,10 @@ const tools: Tool[] = [
         assigneeId: {
           type: 'number',
           description: 'New assignee user ID',
+        },
+        parentId: {
+          type: ['number', 'null'],
+          description: 'New parent work package ID. Set to a work package ID to move under a parent, or set to null to remove from current parent (make top-level).',
         },
         startDate: {
           type: 'string',
@@ -663,6 +671,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           typeId: args.typeId as number | undefined,
           description: args.description as string | undefined,
           assigneeId: args.assigneeId as number | undefined,
+          parentId: args.parentId as number | undefined,
           startDate: args.startDate as string | undefined,
           dueDate: args.dueDate as string | undefined,
         });
@@ -681,6 +690,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           subject: args.subject as string | undefined,
           description: args.description as string | undefined,
           assigneeId: args.assigneeId as number | undefined,
+          parentId: args.parentId as number | null | undefined,
           startDate: args.startDate as string | undefined,
           dueDate: args.dueDate as string | undefined,
           statusId: args.statusId as number | undefined,

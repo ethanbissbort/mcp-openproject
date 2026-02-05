@@ -228,6 +228,7 @@ export class OpenProjectClient {
     typeId?: number;
     description?: string;
     assigneeId?: number;
+    parentId?: number;
     startDate?: string;
     dueDate?: string;
   }): Promise<WorkPackage> {
@@ -259,6 +260,12 @@ export class OpenProjectClient {
       };
     }
 
+    if (data.parentId) {
+      payload._links.parent = {
+        href: `/api/v3/work_packages/${data.parentId}`,
+      };
+    }
+
     if (data.startDate) payload.startDate = data.startDate;
     if (data.dueDate) payload.dueDate = data.dueDate;
 
@@ -274,6 +281,7 @@ export class OpenProjectClient {
       subject?: string;
       description?: string;
       assigneeId?: number;
+      parentId?: number | null;
       startDate?: string;
       dueDate?: string;
       statusId?: number;
@@ -294,7 +302,7 @@ export class OpenProjectClient {
       };
     }
 
-    if (data.assigneeId !== undefined || data.statusId !== undefined) {
+    if (data.assigneeId !== undefined || data.statusId !== undefined || data.parentId !== undefined) {
       payload._links = {};
 
       if (data.assigneeId !== undefined) {
@@ -306,6 +314,12 @@ export class OpenProjectClient {
       if (data.statusId !== undefined) {
         payload._links.status = {
           href: `/api/v3/statuses/${data.statusId}`,
+        };
+      }
+
+      if (data.parentId !== undefined) {
+        payload._links.parent = {
+          href: data.parentId === null ? null : `/api/v3/work_packages/${data.parentId}`,
         };
       }
     }
