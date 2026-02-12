@@ -163,7 +163,7 @@ Get details of a specific work package.
 - `id` (string, required): Work package ID
 
 #### create_work_package
-Create a new work package (task/issue).
+Create a new work package (task/issue). Supports setting a parent to create task hierarchies.
 
 **Parameters**:
 - `subject` (string, required): Work package subject/title
@@ -171,17 +171,21 @@ Create a new work package (task/issue).
 - `typeId` (number, optional): Work package type ID
 - `description` (string, optional): Description (supports markdown)
 - `assigneeId` (number, optional): User ID of assignee
+- `parentId` (number, optional): Parent work package ID for creating subtasks/child work packages
 - `startDate` (string, optional): Start date (YYYY-MM-DD format)
 - `dueDate` (string, optional): Due date (YYYY-MM-DD format)
 
+**Creating Task Hierarchies**: To build parent-child structures, first create the parent work package, then create child work packages using the parent's ID as `parentId`. For example, create an epic "Climate Data Analysis", then create subtasks "Gather historical data" and "Run CMIP6 projections" with `parentId` set to the epic's ID.
+
 #### update_work_package
-Update an existing work package.
+Update an existing work package. Supports re-parenting (moving under a different parent) or removing from a parent.
 
 **Parameters**:
 - `id` (string, required): Work package ID
 - `subject` (string, optional): New subject/title
 - `description` (string, optional): New description (supports markdown)
 - `assigneeId` (number, optional): New assignee user ID
+- `parentId` (number|null, optional): New parent work package ID, or null to remove from current parent (make top-level)
 - `startDate` (string, optional): Start date (YYYY-MM-DD format)
 - `dueDate` (string, optional): Due date (YYYY-MM-DD format)
 - `statusId` (number, optional): Status ID
@@ -386,6 +390,8 @@ Once configured with Claude Desktop, you can ask Claude to:
 - "Create a new project called 'Website Redesign' with identifier 'web-redesign'"
 - "Show me all open work packages in project 5"
 - "Create a new task in project 3 with subject 'Fix login bug'"
+- "Create an epic 'Climate Data Analysis' in project 2 with subtasks 'Gather historical data' and 'Run CMIP6 projections'"
+- "Move work package 15 under parent task 10"
 - "Update work package 42 to set it as 50% complete"
 - "Log 3.5 hours of work on task 15 for today"
 - "List all users in the system"
