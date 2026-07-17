@@ -683,6 +683,219 @@ const tools: Tool[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'list_versions',
+    description: 'List all versions/milestones visible to the current user across all projects. Versions power the OpenProject Roadmap view and are ideal for phase tracking.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pageSize: {
+          type: 'number',
+          description: 'Number of results per page (default: 20)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Offset for pagination (default: 1)',
+        },
+      },
+    },
+  },
+  {
+    name: 'list_project_versions',
+    description: 'List all versions/milestones available in a specific project (including shared versions from other projects). Versions power the Roadmap view and are useful for tracking project phases (e.g., Storage, Workshop, Housing, Farming, Beekeeping).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: ['string', 'number'],
+          description: 'Project ID or identifier',
+        },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'get_version',
+    description: 'Get details of a specific version/milestone by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Version ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'create_version',
+    description: 'Create a new version/milestone in a project. Versions are OpenProject\'s mechanism behind the Roadmap view — use them to define project phases (e.g., Storage, Workshop, Housing, Farming, Beekeeping) and then assign work packages to them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'number',
+          description: 'ID of the project that defines this version',
+        },
+        name: {
+          type: 'string',
+          description: 'Version/milestone name (e.g., "Phase 1: Storage")',
+        },
+        description: {
+          type: 'string',
+          description: 'Version description (supports markdown)',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date (YYYY-MM-DD format)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date (YYYY-MM-DD format)',
+        },
+        status: {
+          type: 'string',
+          enum: ['open', 'locked', 'closed'],
+          description: 'Version status (default: open)',
+        },
+        sharing: {
+          type: 'string',
+          description: 'Sharing mode: none, descendants, hierarchy, tree, or system (default: none)',
+        },
+      },
+      required: ['projectId', 'name'],
+    },
+  },
+  {
+    name: 'update_version',
+    description: 'Update an existing version/milestone (name, description, dates, status, sharing)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Version ID',
+        },
+        name: {
+          type: 'string',
+          description: 'New version name',
+        },
+        description: {
+          type: 'string',
+          description: 'New description (supports markdown)',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date (YYYY-MM-DD format)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date (YYYY-MM-DD format)',
+        },
+        status: {
+          type: 'string',
+          enum: ['open', 'locked', 'closed'],
+          description: 'Version status',
+        },
+        sharing: {
+          type: 'string',
+          description: 'Sharing mode: none, descendants, hierarchy, tree, or system',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_version',
+    description: 'Delete a version/milestone by ID. Work packages assigned to it lose their version assignment.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Version ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'set_work_package_version',
+    description: 'Assign a work package to a version/milestone so it appears in the Roadmap view. Handles the required lockVersion automatically.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+        versionId: {
+          type: 'number',
+          description: 'Version ID to assign the work package to',
+        },
+      },
+      required: ['workPackageId', 'versionId'],
+    },
+  },
+  {
+    name: 'delete_project',
+    description: 'Delete a project by ID or identifier. WARNING: this PERMANENTLY deletes the project and ALL of its work packages, versions, time entries, and other data. This action cannot be undone — confirm with the user before calling.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Project ID or identifier',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'update_time_entry',
+    description: 'Update an existing time entry (hours, date, comment, activity)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Time entry ID',
+        },
+        hours: {
+          type: 'number',
+          description: 'Hours spent (e.g., 2.5 for 2.5 hours)',
+        },
+        spentOn: {
+          type: 'string',
+          description: 'Date when time was spent (YYYY-MM-DD format)',
+        },
+        comment: {
+          type: 'string',
+          description: 'Comment about the time entry (supports markdown)',
+        },
+        activityId: {
+          type: 'number',
+          description: 'Activity ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_time_entry',
+    description: 'Delete a time entry by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Time entry ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -1169,6 +1382,152 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Membership ${args.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'list_versions': {
+        const result = await client.listVersions({
+          pageSize: args?.pageSize as number | undefined,
+          offset: args?.offset as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_project_versions': {
+        const result = await client.listProjectVersions(args.projectId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_version': {
+        const result = await client.getVersion(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_version': {
+        const result = await client.createVersion({
+          projectId: args.projectId as number,
+          name: args.name as string,
+          description: args.description as string | undefined,
+          startDate: args.startDate as string | undefined,
+          endDate: args.endDate as string | undefined,
+          status: args.status as 'open' | 'locked' | 'closed' | undefined,
+          sharing: args.sharing as string | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'update_version': {
+        const result = await client.updateVersion(args.id as string, {
+          name: args.name as string | undefined,
+          description: args.description as string | undefined,
+          startDate: args.startDate as string | undefined,
+          endDate: args.endDate as string | undefined,
+          status: args.status as 'open' | 'locked' | 'closed' | undefined,
+          sharing: args.sharing as string | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_version': {
+        await client.deleteVersion(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Version ${args.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'set_work_package_version': {
+        const result = await client.setWorkPackageVersion(
+          args.workPackageId as string | number,
+          args.versionId as number
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_project': {
+        await client.deleteProject(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Project ${args.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'update_time_entry': {
+        const result = await client.updateTimeEntry(args.id as string, {
+          hours: args.hours as number | undefined,
+          spentOn: args.spentOn as string | undefined,
+          comment: args.comment as string | undefined,
+          activityId: args.activityId as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_time_entry': {
+        await client.deleteTimeEntry(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Time entry ${args.id} deleted successfully`,
             },
           ],
         };

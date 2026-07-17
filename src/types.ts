@@ -274,3 +274,21 @@ export interface Membership {
     roles?: Role[];
   };
 }
+
+export interface Version {
+  _type: string;
+  id: number;
+  name: string;
+  description?: {
+    format: string;
+    raw: string;
+    html: string;
+  };
+  startDate?: string;
+  endDate?: string;
+  status: 'open' | 'locked' | 'closed';
+  sharing: string;
+  createdAt: string;
+  updatedAt: string;
+  _links: HalLinks;
+}
