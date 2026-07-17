@@ -15,6 +15,9 @@ import type {
   Relation,
   WorkPackageHierarchy,
   Activity,
+  Attachment,
+  Query,
+  WikiPage,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -686,7 +689,7 @@ export class OpenProjectClient {
     });
 
     return this.request<Collection<Activity>>(
-      `/api/v3/work_packages/${workPackageId}/activities?${params}`
+      `/work_packages/${workPackageId}/activities?${params}`
     );
   }
 
@@ -696,5 +699,165 @@ export class OpenProjectClient {
     return activities._embedded.elements.filter(
       (activity) => activity.comment && activity.comment.raw
     );
+  }
+
+  async addWorkPackageComment(
+    workPackageId: string | number,
+    comment: string,
+    notify?: boolean
+  ): Promise<Activity> {
+    const queryParams = new URLSearchParams();
+    if (notify !== undefined) queryParams.set('notify', notify.toString());
+
+    const query = queryParams.toString();
+    return this.request<Activity>(
+      `/work_packages/${workPackageId}/activities${query ? '?' + query : ''}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          comment: {
+            raw: comment,
+          },
+        }),
+      }
+    );
+  }
+
+  // Attachment Methods
+
+  async listWorkPackageAttachments(
+    workPackageId: string | number
+  ): Promise<Collection<Attachment>> {
+    return this.request<Collection<Attachment>>(
+      `/work_packages/${workPackageId}/attachments`
+    );
+  }
+
+  async uploadWorkPackageAttachment(data: {
+    workPackageId: string | number;
+    fileName: string;
+    fileContentBase64: string;
+    contentType?: string;
+    description?: string;
+  }): Promise<Attachment> {
+    const url = `${this.baseUrl}/api/v3/work_packages/${data.workPackageId}/attachments`;
+
+    const metadata: any = { fileName: data.fileName };
+    if (data.description) {
+      metadata.description = { raw: data.description };
+    }
+
+    const fileBuffer = Buffer.from(data.fileContentBase64, 'base64');
+    const blob = new Blob([fileBuffer], {
+      type: data.contentType || 'application/octet-stream',
+    });
+
+    const formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+    formData.append('file', blob, data.fileName);
+
+    // Direct fetch: the shared request() helper forces Content-Type: application/json,
+    // but multipart uploads need fetch to set the multipart boundary itself.
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.authHeader,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMessage = response.statusText;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ErrorResponse;
+          errorMessage = errorData.message || errorMessage;
+        } else {
+          const textError = await response.text();
+          errorMessage = textError || errorMessage;
+        }
+      } catch {
+        // If parsing fails, use status text
+      }
+      throw new Error(`OpenProject API error (${response.status}): ${errorMessage}`);
+    }
+
+    return response.json() as Promise<Attachment>;
+  }
+
+  async deleteAttachment(id: string | number): Promise<void> {
+    await this.request<void>(`/attachments/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Query (Saved View) Methods
+
+  async listQueries(params?: {
+    filters?: string;
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Query>> {
+    const queryParams = new URLSearchParams();
+    if (params?.filters) queryParams.set('filters', params.filters);
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Query>>(
+      `/queries${query ? '?' + query : ''}`
+    );
+  }
+
+  async getQuery(id: string | number): Promise<Query> {
+    return this.request<Query>(`/queries/${id}`);
+  }
+
+  async createQuery(data: {
+    name: string;
+    projectId?: string | number;
+    filters?: unknown[];
+    groupBy?: string;
+    sortBy?: unknown[];
+    timelineVisible?: boolean;
+    public?: boolean;
+    starred?: boolean;
+  }): Promise<Query> {
+    const payload: any = {
+      name: data.name,
+      filters: data.filters ?? [],
+      public: data.public ?? false,
+      starred: data.starred ?? false,
+      timelineVisible: data.timelineVisible ?? false,
+    };
+
+    if (data.groupBy !== undefined) payload.groupBy = data.groupBy;
+    if (data.sortBy !== undefined) payload.sortBy = data.sortBy;
+
+    if (data.projectId !== undefined) {
+      payload._links = {
+        project: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+      };
+    }
+
+    return this.request<Query>('/queries', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteQuery(id: string | number): Promise<void> {
+    await this.request<void>(`/queries/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Wiki Page Methods
+
+  async getWikiPage(id: string | number): Promise<WikiPage> {
+    return this.request<WikiPage>(`/wiki_pages/${id}`);
   }
 }

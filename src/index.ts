@@ -562,6 +562,191 @@ const tools: Tool[] = [
       required: ['workPackageId'],
     },
   },
+  {
+    name: 'add_work_package_comment',
+    description: 'Add a comment to a work package. The comment supports markdown formatting and appears in the work package activity stream.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+        comment: {
+          type: 'string',
+          description: 'Comment text (supports markdown)',
+        },
+        notify: {
+          type: 'boolean',
+          description: 'Whether to send notifications to watchers (default: true). Set to false to suppress notifications.',
+        },
+      },
+      required: ['workPackageId', 'comment'],
+    },
+  },
+  {
+    name: 'list_work_package_attachments',
+    description: 'List all attachments (files) on a work package. Returns file names, sizes, content types, and download locations.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
+  {
+    name: 'upload_work_package_attachment',
+    description: 'Upload a file attachment to a work package. File content must be provided as a base64-encoded string.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID',
+        },
+        fileName: {
+          type: 'string',
+          description: 'Name of the file (e.g., "report.pdf")',
+        },
+        fileContentBase64: {
+          type: 'string',
+          description: 'File content encoded as base64',
+        },
+        contentType: {
+          type: 'string',
+          description: 'MIME type of the file (default: application/octet-stream)',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional description of the attachment',
+        },
+      },
+      required: ['workPackageId', 'fileName', 'fileContentBase64'],
+    },
+  },
+  {
+    name: 'delete_attachment',
+    description: 'Delete an attachment by its attachment ID (not the work package ID).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: ['string', 'number'],
+          description: 'Attachment ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_queries',
+    description: 'List saved queries in OpenProject. Saved queries are the "saved views" shown in the OpenProject UI sidebar (custom-filtered work package views). Supports filtering and pagination.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filters: {
+          type: 'string',
+          description: 'JSON filters for the query (e.g., [{"project":{"operator":"=","values":["1"]}}])',
+        },
+        pageSize: {
+          type: 'number',
+          description: 'Number of results per page (default: 20)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Offset for pagination (default: 1)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_query',
+    description: 'Get details of a specific saved query (saved view) by ID, including its filters, columns, sort order, and grouping.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: ['string', 'number'],
+          description: 'Query ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'create_query',
+    description: 'Create a saved query (saved view) in OpenProject. Saved queries appear as custom views in the OpenProject UI. Can be scoped to a project or global.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the saved query/view',
+        },
+        projectId: {
+          type: ['string', 'number'],
+          description: 'Project ID to scope the query to. Omit for a global query.',
+        },
+        filters: {
+          type: 'string',
+          description: 'JSON array of filters in OpenProject query filter format (e.g., [{"status":{"operator":"o","values":[]}}] for open items)',
+        },
+        groupBy: {
+          type: 'string',
+          description: 'Attribute to group results by (e.g., "status", "assignee", "type")',
+        },
+        sortBy: {
+          type: 'string',
+          description: 'JSON array of sort criteria (e.g., [["id","asc"]] or [["dueDate","desc"]])',
+        },
+        timelineVisible: {
+          type: 'boolean',
+          description: 'Whether the timeline (Gantt) view is visible (default: false)',
+        },
+        public: {
+          type: 'boolean',
+          description: 'Whether the query is visible to all users (default: false)',
+        },
+        starred: {
+          type: 'boolean',
+          description: 'Whether the query is starred/favorited (default: false)',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'delete_query',
+    description: 'Delete a saved query (saved view) by ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: ['string', 'number'],
+          description: 'Query ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'get_wiki_page',
+    description: 'Get a wiki page by its numeric ID. Note: the OpenProject API v3 only supports reading a wiki page by its numeric ID; listing wiki pages or looking them up by title/slug is not supported by the API.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: ['string', 'number'],
+          description: 'Numeric wiki page ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -948,6 +1133,143 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_work_package_comments': {
         const result = await client.getWorkPackageComments(args.workPackageId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'add_work_package_comment': {
+        const result = await client.addWorkPackageComment(
+          args.workPackageId as string | number,
+          args.comment as string,
+          args.notify as boolean | undefined
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_work_package_attachments': {
+        const result = await client.listWorkPackageAttachments(
+          args.workPackageId as string | number
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'upload_work_package_attachment': {
+        const result = await client.uploadWorkPackageAttachment({
+          workPackageId: args.workPackageId as string | number,
+          fileName: args.fileName as string,
+          fileContentBase64: args.fileContentBase64 as string,
+          contentType: args.contentType as string | undefined,
+          description: args.description as string | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_attachment': {
+        await client.deleteAttachment(args.id as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Attachment ${args.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'list_queries': {
+        const result = await client.listQueries({
+          filters: args?.filters as string | undefined,
+          pageSize: args?.pageSize as number | undefined,
+          offset: args?.offset as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_query': {
+        const result = await client.getQuery(args.id as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_query': {
+        const result = await client.createQuery({
+          name: args.name as string,
+          projectId: args.projectId as string | number | undefined,
+          filters: args.filters !== undefined
+            ? (JSON.parse(args.filters as string) as unknown[])
+            : undefined,
+          groupBy: args.groupBy as string | undefined,
+          sortBy: args.sortBy !== undefined
+            ? (JSON.parse(args.sortBy as string) as unknown[])
+            : undefined,
+          timelineVisible: args.timelineVisible as boolean | undefined,
+          public: args.public as boolean | undefined,
+          starred: args.starred as boolean | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_query': {
+        await client.deleteQuery(args.id as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Query ${args.id} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'get_wiki_page': {
+        const result = await client.getWikiPage(args.id as string | number);
         return {
           content: [
             {

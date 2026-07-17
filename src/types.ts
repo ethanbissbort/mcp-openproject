@@ -248,6 +248,55 @@ export interface Activity {
   };
 }
 
+export interface Attachment {
+  _type: string;
+  id: number;
+  fileName: string;
+  fileSize: number;
+  description?: {
+    format: string;
+    raw: string;
+    html: string;
+  };
+  contentType: string;
+  digest?: {
+    algorithm: string;
+    hash: string;
+  };
+  createdAt: string;
+  _links: HalLinks & {
+    downloadLocation?: HalLink;
+    container?: HalLink;
+    author?: HalLink;
+  };
+}
+
+export interface Query {
+  _type: string;
+  id: number;
+  name: string;
+  filters: unknown[];
+  sums?: boolean;
+  public?: boolean;
+  starred?: boolean;
+  timelineVisible?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  _links: HalLinks;
+  // The query resource is complex (columns, groupBy, sortBy, timeline settings, etc.)
+  [key: string]: unknown;
+}
+
+export interface WikiPage {
+  _type: string;
+  id: number;
+  title: string;
+  slug?: string;
+  _links: HalLinks;
+  // Wiki page resource may include additional embedded/linked properties
+  [key: string]: unknown;
+}
+
 export interface ErrorResponse {
   _type: string;
   errorIdentifier: string;
