@@ -4,17 +4,21 @@ A Model Context Protocol (MCP) server that provides integration with OpenProject
 
 ## 🎯 Capabilities Status
 
-**Current Status**: ✅ **Phase 1 Complete - Agentic Foundation Ready**
+**Current Status**: ✅ **Phase 2 Complete - Full Project Management**
 
 This connector now provides comprehensive data access enabling Claude to perform:
 - ✅ **Strategic Analysis** - Load and analyze entire project contexts
 - ✅ **Dependency Mapping** - Understand work package relationships and hierarchies
+- ✅ **Dependency Management** - Create, update, and delete relations (blocks, precedes/follows, relates, etc.)
+- ✅ **Version/Milestone Management** - Create and manage versions for Roadmap-based phase tracking
+- ✅ **Team Collaboration** - Manage project members and roles, post comments, upload attachments
 - ✅ **Team Collaboration Insights** - Access discussions and change history
-- ✅ **Custom Field Support** - Work with organization-specific metadata
+- ✅ **Custom Field Support** - Discover custom fields via schemas and set values on work packages
+- ✅ **Saved Views** - Create and manage saved queries (the "saved views" in the OpenProject UI)
 - ✅ **Executive Summaries** - Generate project overviews with statistics
 - ✅ **Gap Identification** - Identify blockers and critical path issues
 
-**Total MCP Tools**: 27 comprehensive tools for project management
+**Total MCP Tools**: 57 comprehensive tools for project management
 
 **Development Status**: See [ROADMAP.md](./ROADMAP.md) for detailed progress and upcoming features.
 
@@ -22,14 +26,20 @@ This connector now provides comprehensive data access enabling Claude to perform
 
 This MCP server provides tools to:
 
-- **Projects**: List, get, create, and update projects
-- **Work Packages**: List, get, create, update, and delete work packages (tasks/issues)
-- **Work Package Relationships**: Access dependencies, hierarchies, and blocking relationships
-- **Work Package Activities & Comments**: Access activity history, comments, and change logs
-- **Work Package Types**: List and get work package types (Task, Bug, Feature, etc.)
+- **Projects**: List, get, create, update, and delete projects (including hierarchical subprojects)
+- **Work Packages**: List, get, create, update, and delete work packages (tasks/issues), including parent assignment and custom field values
+- **Work Package Relationships**: Create, update, and delete relations (blocks, precedes/follows, relates, duplicates, includes, requires) plus read dependencies, hierarchies, and blocking relationships
+- **Work Package Schemas**: Discover available fields (including custom fields) per project/type combination
+- **Versions/Milestones**: Create, update, and delete versions and assign work packages to them — powers OpenProject's Roadmap view for phase tracking
+- **Memberships & Roles**: Add, update, and remove project members with role assignments; list available roles
+- **Work Package Activities & Comments**: Read activity history and change logs; post new comments
+- **Attachments**: List, upload, and delete work package attachments
+- **Saved Queries**: List, get, create, and delete saved queries ("saved views" in the OpenProject UI)
+- **Wiki Pages**: Read wiki pages by ID
+- **Work Package Types**: List and get work package types (Task, Bug, Feature, Milestone, etc.)
 - **Work Package Statuses**: List and get work package statuses (New, In Progress, Closed, etc.)
 - **Users**: List and get user information
-- **Time Entries**: Create and list time tracking entries
+- **Time Entries**: Create, update, delete, and list time tracking entries
 - **Time Entry Activities**: List and get time entry activities (Development, Testing, etc.)
 - **Bulk Operations & Analytics**: Load entire projects with statistics for comprehensive analysis
 
@@ -381,6 +391,40 @@ Get all comments for a work package, filtering out change history noise.
 - `workPackageId` (string|number, required): Work package ID
 
 **Returns**: Array of activities containing only those with comment content
+
+### Relation Management
+
+- **create_relation** — Create a dependency between two work packages. Params: `fromId`, `toId`, `type` (`relates`, `duplicates`, `duplicated`, `blocks`, `blocked`, `precedes`, `follows`, `includes`, `partof`, `requires`, `required`), optional `description` and `lag` (working days, for precedes/follows).
+- **update_relation** — Update a relation's type, description, or lag. Params: `relationId` plus fields to change.
+- **delete_relation** — Remove a relation. Params: `relationId`.
+- **set_work_package_parent** — Set or clear (pass `null`) a work package's parent to build task hierarchies. Handles OpenProject's `lockVersion` optimistic locking automatically.
+- **get_work_package_schema** — Discover all available fields (including custom fields and their allowed values) for a project/type combination. Params: `projectId`, `typeId`.
+
+### Versions & Milestones (Roadmap)
+
+- **list_versions** / **list_project_versions** — List all visible versions, or those available in a project.
+- **get_version** / **create_version** / **update_version** / **delete_version** — Full version lifecycle. Create takes `projectId`, `name`, and optional `description`, `startDate`, `endDate`, `status` (`open`/`locked`/`closed`), `sharing`. Versions power OpenProject's Roadmap view — ideal for phase tracking (e.g. Storage → Workshop → Housing → Farming → Beekeeping).
+- **set_work_package_version** — Assign a work package to a version. Params: `workPackageId`, `versionId`.
+
+### Project Lifecycle & Time Entry Management
+
+- **delete_project** — ⚠️ Permanently deletes a project and all its work packages.
+- **update_time_entry** / **delete_time_entry** — Modify or remove logged time.
+
+### Memberships & Roles
+
+- **list_roles** / **get_role** — Discover role IDs (Member, Reader, Project admin, etc.) needed for member management.
+- **list_memberships** / **get_membership** — Query project members (filterable by project).
+- **create_membership** — Add a user to a project with one or more roles. Params: `projectId`, `userId`, `roleIds`, optional `notificationMessage`.
+- **update_membership** — Change a member's roles. Params: `membershipId`, `roleIds`.
+- **delete_membership** — Remove a member from a project.
+
+### Comments, Attachments, Queries & Wiki
+
+- **add_work_package_comment** — Post a markdown comment on a work package (optional `notify` suppression).
+- **list_work_package_attachments** / **upload_work_package_attachment** / **delete_attachment** — Manage file attachments; upload takes base64-encoded content.
+- **list_queries** / **get_query** / **create_query** / **delete_query** — Manage saved queries (the "saved views" in the OpenProject UI) with filters, grouping, sorting, and timeline visibility.
+- **get_wiki_page** — Read a wiki page by numeric ID (API v3 only supports reading).
 
 ## Example Usage
 
