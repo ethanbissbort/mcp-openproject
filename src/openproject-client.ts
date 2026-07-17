@@ -15,6 +15,7 @@ import type {
   Relation,
   WorkPackageHierarchy,
   Activity,
+  Version,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -696,5 +697,177 @@ export class OpenProjectClient {
     return activities._embedded.elements.filter(
       (activity) => activity.comment && activity.comment.raw
     );
+  }
+
+  // Version (Milestone/Roadmap) Methods
+
+  async listVersions(params?: {
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Version>> {
+    const queryParams = new URLSearchParams();
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Version>>(
+      `/versions${query ? '?' + query : ''}`
+    );
+  }
+
+  async listProjectVersions(projectId: string | number): Promise<Collection<Version>> {
+    return this.request<Collection<Version>>(`/projects/${projectId}/versions`);
+  }
+
+  async getVersion(id: string): Promise<Version> {
+    return this.request<Version>(`/versions/${id}`);
+  }
+
+  async createVersion(data: {
+    projectId: number;
+    name: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: 'open' | 'locked' | 'closed';
+    sharing?: string;
+  }): Promise<Version> {
+    const payload: any = {
+      name: data.name,
+      _links: {
+        definingProject: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+      },
+    };
+
+    if (data.description !== undefined) {
+      payload.description = {
+        format: 'markdown',
+        raw: data.description,
+      };
+    }
+
+    if (data.startDate) payload.startDate = data.startDate;
+    if (data.endDate) payload.endDate = data.endDate;
+    if (data.status) payload.status = data.status;
+    if (data.sharing) payload.sharing = data.sharing;
+
+    return this.request<Version>('/versions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateVersion(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      status?: 'open' | 'locked' | 'closed';
+      sharing?: string;
+    }
+  ): Promise<Version> {
+    const payload: any = {};
+
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.startDate !== undefined) payload.startDate = data.startDate;
+    if (data.endDate !== undefined) payload.endDate = data.endDate;
+    if (data.status !== undefined) payload.status = data.status;
+    if (data.sharing !== undefined) payload.sharing = data.sharing;
+
+    if (data.description !== undefined) {
+      payload.description = {
+        format: 'markdown',
+        raw: data.description,
+      };
+    }
+
+    return this.request<Version>(`/versions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteVersion(id: string): Promise<void> {
+    await this.request<void>(`/versions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setWorkPackageVersion(
+    workPackageId: string | number,
+    versionId: number
+  ): Promise<WorkPackage> {
+    // Fetch the work package first to obtain its current lockVersion
+    // (required by OpenProject for optimistic locking on updates)
+    const workPackage = await this.getWorkPackage(workPackageId.toString());
+
+    const payload = {
+      lockVersion: workPackage.lockVersion,
+      _links: {
+        version: {
+          href: `/api/v3/versions/${versionId}`,
+        },
+      },
+    };
+
+    return this.request<WorkPackage>(`/work_packages/${workPackageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Project Lifecycle Methods
+
+  async deleteProject(id: string): Promise<void> {
+    await this.request<void>(`/projects/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Time Entry Lifecycle Methods
+
+  async updateTimeEntry(
+    id: string,
+    data: {
+      hours?: number;
+      spentOn?: string;
+      comment?: string;
+      activityId?: number;
+    }
+  ): Promise<TimeEntry> {
+    const payload: any = {};
+
+    if (data.hours !== undefined) payload.hours = `PT${data.hours}H`;
+    if (data.spentOn !== undefined) payload.spentOn = data.spentOn;
+
+    if (data.comment !== undefined) {
+      payload.comment = {
+        format: 'markdown',
+        raw: data.comment,
+      };
+    }
+
+    if (data.activityId !== undefined) {
+      payload._links = {
+        activity: {
+          href: `/api/v3/time_entries/activities/${data.activityId}`,
+        },
+      };
+    }
+
+    return this.request<TimeEntry>(`/time_entries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteTimeEntry(id: string): Promise<void> {
+    await this.request<void>(`/time_entries/${id}`, {
+      method: 'DELETE',
+    });
   }
 }
