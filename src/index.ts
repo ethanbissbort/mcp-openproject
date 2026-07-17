@@ -183,7 +183,7 @@ const tools: Tool[] = [
   },
   {
     name: 'create_work_package',
-    description: 'Create a new work package (task/issue) in OpenProject',
+    description: 'Create a new work package (task/issue) in OpenProject. Supports setting a parent to create task hierarchies (e.g., create a parent epic, then create child tasks with parentId pointing to the epic).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -207,6 +207,10 @@ const tools: Tool[] = [
           type: 'number',
           description: 'User ID of assignee',
         },
+        parentId: {
+          type: 'number',
+          description: 'Parent work package ID. Use this to create subtasks/child work packages under a parent task, epic, or feature.',
+        },
         startDate: {
           type: 'string',
           description: 'Start date (YYYY-MM-DD format)',
@@ -221,7 +225,7 @@ const tools: Tool[] = [
   },
   {
     name: 'update_work_package',
-    description: 'Update an existing work package',
+    description: 'Update an existing work package. Supports re-parenting (moving a work package under a different parent) or removing from a parent.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -240,6 +244,10 @@ const tools: Tool[] = [
         assigneeId: {
           type: 'number',
           description: 'New assignee user ID',
+        },
+        parentId: {
+          type: ['number', 'null'],
+          description: 'New parent work package ID. Set to a work package ID to move under a parent, or set to null to remove from current parent (make top-level).',
         },
         startDate: {
           type: 'string',
@@ -554,6 +562,127 @@ const tools: Tool[] = [
       required: ['workPackageId'],
     },
   },
+  {
+    name: 'list_roles',
+    description: 'List all roles available in OpenProject. Use this to find role IDs needed when adding members to a project (typical built-in roles: Member, Reader, Project admin).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_role',
+    description: 'Get details of a specific role by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Role ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_memberships',
+    description: 'List project memberships (which users/groups belong to which projects, and their roles). Supports filtering and pagination.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filters: {
+          type: 'string',
+          description: 'JSON filters (e.g., [{"project":{"operator":"=","values":["123"]}}] to list members of project 123)',
+        },
+        pageSize: {
+          type: 'number',
+          description: 'Number of results per page (default: 20)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Offset for pagination (default: 1)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_membership',
+    description: 'Get details of a specific membership by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Membership ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'create_membership',
+    description: 'Add a user as a member of a project with one or more roles. Use list_roles to find role IDs (e.g., Member, Reader, Project admin).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'number',
+          description: 'Project ID',
+        },
+        userId: {
+          type: 'number',
+          description: 'User ID of the principal to add as a member',
+        },
+        roleIds: {
+          type: 'array',
+          items: {
+            type: 'number',
+          },
+          description: 'Array of role IDs to assign to the member',
+        },
+        notificationMessage: {
+          type: 'string',
+          description: 'Optional notification message sent to the new member',
+        },
+      },
+      required: ['projectId', 'userId', 'roleIds'],
+    },
+  },
+  {
+    name: 'update_membership',
+    description: 'Update an existing membership, replacing its roles with a new set of roles',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        membershipId: {
+          type: 'string',
+          description: 'Membership ID',
+        },
+        roleIds: {
+          type: 'array',
+          items: {
+            type: 'number',
+          },
+          description: 'Array of role IDs that will replace the current roles',
+        },
+      },
+      required: ['membershipId', 'roleIds'],
+    },
+  },
+  {
+    name: 'delete_membership',
+    description: 'Remove a member from a project by deleting the membership',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Membership ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -663,6 +792,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           typeId: args.typeId as number | undefined,
           description: args.description as string | undefined,
           assigneeId: args.assigneeId as number | undefined,
+          parentId: args.parentId as number | undefined,
           startDate: args.startDate as string | undefined,
           dueDate: args.dueDate as string | undefined,
         });
@@ -681,6 +811,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           subject: args.subject as string | undefined,
           description: args.description as string | undefined,
           assigneeId: args.assigneeId as number | undefined,
+          parentId: args.parentId as number | null | undefined,
           startDate: args.startDate as string | undefined,
           dueDate: args.dueDate as string | undefined,
           statusId: args.statusId as number | undefined,
@@ -943,6 +1074,101 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_roles': {
+        const result = await client.listRoles();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_role': {
+        const result = await client.getRole(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_memberships': {
+        const result = await client.listMemberships({
+          filters: args?.filters as string | undefined,
+          pageSize: args?.pageSize as number | undefined,
+          offset: args?.offset as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_membership': {
+        const result = await client.getMembership(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_membership': {
+        const result = await client.createMembership({
+          projectId: args.projectId as number,
+          userId: args.userId as number,
+          roleIds: args.roleIds as number[],
+          notificationMessage: args.notificationMessage as string | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'update_membership': {
+        const result = await client.updateMembership(String(args.membershipId), {
+          roleIds: args.roleIds as number[],
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_membership': {
+        await client.deleteMembership(args.id as string);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Membership ${args.id} deleted successfully`,
             },
           ],
         };

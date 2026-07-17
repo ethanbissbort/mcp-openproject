@@ -15,6 +15,8 @@ import type {
   Relation,
   WorkPackageHierarchy,
   Activity,
+  Role,
+  Membership,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -228,6 +230,7 @@ export class OpenProjectClient {
     typeId?: number;
     description?: string;
     assigneeId?: number;
+    parentId?: number;
     startDate?: string;
     dueDate?: string;
   }): Promise<WorkPackage> {
@@ -259,6 +262,12 @@ export class OpenProjectClient {
       };
     }
 
+    if (data.parentId) {
+      payload._links.parent = {
+        href: `/api/v3/work_packages/${data.parentId}`,
+      };
+    }
+
     if (data.startDate) payload.startDate = data.startDate;
     if (data.dueDate) payload.dueDate = data.dueDate;
 
@@ -274,6 +283,7 @@ export class OpenProjectClient {
       subject?: string;
       description?: string;
       assigneeId?: number;
+      parentId?: number | null;
       startDate?: string;
       dueDate?: string;
       statusId?: number;
@@ -294,7 +304,7 @@ export class OpenProjectClient {
       };
     }
 
-    if (data.assigneeId !== undefined || data.statusId !== undefined) {
+    if (data.assigneeId !== undefined || data.statusId !== undefined || data.parentId !== undefined) {
       payload._links = {};
 
       if (data.assigneeId !== undefined) {
@@ -306,6 +316,12 @@ export class OpenProjectClient {
       if (data.statusId !== undefined) {
         payload._links.status = {
           href: `/api/v3/statuses/${data.statusId}`,
+        };
+      }
+
+      if (data.parentId !== undefined) {
+        payload._links.parent = {
+          href: data.parentId === null ? null : `/api/v3/work_packages/${data.parentId}`,
         };
       }
     }
@@ -682,5 +698,95 @@ export class OpenProjectClient {
     return activities._embedded.elements.filter(
       (activity) => activity.comment && activity.comment.raw
     );
+  }
+
+  // Membership and Role Methods
+
+  async listRoles(): Promise<Collection<Role>> {
+    return this.request<Collection<Role>>('/roles');
+  }
+
+  async getRole(id: string): Promise<Role> {
+    return this.request<Role>(`/roles/${id}`);
+  }
+
+  async listMemberships(params?: {
+    filters?: string;
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Membership>> {
+    const queryParams = new URLSearchParams();
+    if (params?.filters) queryParams.set('filters', params.filters);
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Membership>>(
+      `/memberships${query ? '?' + query : ''}`
+    );
+  }
+
+  async getMembership(id: string): Promise<Membership> {
+    return this.request<Membership>(`/memberships/${id}`);
+  }
+
+  async createMembership(data: {
+    projectId: number;
+    userId: number;
+    roleIds: number[];
+    notificationMessage?: string;
+  }): Promise<Membership> {
+    const payload: any = {
+      _links: {
+        project: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+        principal: {
+          href: `/api/v3/users/${data.userId}`,
+        },
+        roles: data.roleIds.map((roleId) => ({
+          href: `/api/v3/roles/${roleId}`,
+        })),
+      },
+    };
+
+    if (data.notificationMessage) {
+      payload._meta = {
+        notificationMessage: {
+          raw: data.notificationMessage,
+        },
+      };
+    }
+
+    return this.request<Membership>('/memberships', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateMembership(
+    id: string,
+    data: {
+      roleIds: number[];
+    }
+  ): Promise<Membership> {
+    const payload = {
+      _links: {
+        roles: data.roleIds.map((roleId) => ({
+          href: `/api/v3/roles/${roleId}`,
+        })),
+      },
+    };
+
+    return this.request<Membership>(`/memberships/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await this.request<void>(`/memberships/${id}`, {
+      method: 'DELETE',
+    });
   }
 }

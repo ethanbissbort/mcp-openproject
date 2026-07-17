@@ -254,3 +254,23 @@ export interface ErrorResponse {
   message: string;
   details?: any;
 }
+
+export interface Role {
+  _type: string;
+  id: number;
+  name: string;
+  _links: HalLinks;
+}
+
+export interface Membership {
+  _type: string;
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+  _links: HalLinks;
+  _embedded?: {
+    project?: Project;
+    principal?: User;
+    roles?: Role[];
+  };
+}
