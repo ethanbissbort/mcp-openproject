@@ -292,3 +292,51 @@ export interface Version {
   updatedAt: string;
   _links: HalLinks;
 }
+
+// Relation types that can be used when CREATING a relation via the API.
+// (RelationType above also includes read-only virtual types like 'parent'/'children'.)
+export type CreatableRelationType =
+  | 'relates'
+  | 'duplicates'
+  | 'duplicated'
+  | 'blocks'
+  | 'blocked'
+  | 'precedes'
+  | 'follows'
+  | 'includes'
+  | 'partof'
+  | 'requires'
+  | 'required';
+
+// Custom field values for work packages.
+// Raw values (string/number/boolean) are merged directly into the payload;
+// values of the form { href: "..." } (or arrays of them) are merged into _links
+// (used for list/user/version-type custom fields).
+export type CustomFieldValues = Record<
+  string,
+  string | number | boolean | null | { href: string | null } | Array<{ href: string }>
+>;
+
+// A single field definition within a work package schema.
+// HAL+JSON; kept loose because field definitions vary by field type.
+export interface SchemaFieldDefinition {
+  type: string;
+  name: string;
+  required?: boolean;
+  writable?: boolean;
+  hasDefault?: boolean;
+  location?: string;
+  _links?: Record<string, unknown>;
+  _embedded?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// Work package schema (GET /work_packages/schemas/{projectId}-{typeId}).
+// Keys other than _type/_dependencies/_links map to field definitions,
+// including custom fields (e.g. customField1).
+export interface Schema {
+  _type: string;
+  _dependencies?: unknown[];
+  _links?: HalLinks;
+  [key: string]: SchemaFieldDefinition | unknown;
+}

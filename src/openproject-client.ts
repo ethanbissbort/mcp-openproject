@@ -18,6 +18,9 @@ import type {
   Role,
   Membership,
   Version,
+  CreatableRelationType,
+  CustomFieldValues,
+  Schema,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -120,6 +123,38 @@ export class OpenProjectClient {
     } catch (error) {
       console.warn(`Failed to extract ID from href: ${href}`, error);
       return null;
+    }
+  }
+
+  /**
+   * Merge custom field values into a work package payload.
+   * Raw values (string/number/boolean) are set directly on the payload;
+   * values of the form { href: "..." } (or arrays of them) are merged into
+   * _links under the same key (list/user/version-type custom fields).
+   */
+  private applyCustomFields(payload: any, customFields?: CustomFieldValues): void {
+    if (!customFields) {
+      return;
+    }
+
+    for (const [key, value] of Object.entries(customFields)) {
+      const isHrefObject =
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        'href' in value;
+      const isHrefArray =
+        Array.isArray(value) &&
+        value.every(
+          (item) => item !== null && typeof item === 'object' && 'href' in item
+        );
+
+      if (isHrefObject || isHrefArray) {
+        payload._links = payload._links || {};
+        payload._links[key] = value;
+      } else {
+        payload[key] = value;
+      }
     }
   }
 
@@ -234,6 +269,7 @@ export class OpenProjectClient {
     parentId?: number;
     startDate?: string;
     dueDate?: string;
+    customFields?: CustomFieldValues;
   }): Promise<WorkPackage> {
     const payload: any = {
       subject: data.subject,
@@ -272,6 +308,8 @@ export class OpenProjectClient {
     if (data.startDate) payload.startDate = data.startDate;
     if (data.dueDate) payload.dueDate = data.dueDate;
 
+    this.applyCustomFields(payload, data.customFields);
+
     return this.request<WorkPackage>('/work_packages', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -289,9 +327,22 @@ export class OpenProjectClient {
       dueDate?: string;
       statusId?: number;
       percentageDone?: number;
+      lockVersion?: number;
+      customFields?: CustomFieldValues;
     }
   ): Promise<WorkPackage> {
     const payload: any = {};
+
+    // OpenProject requires the current lockVersion for PATCH requests on
+    // work packages (optimistic locking). Fetch it if not provided.
+    let lockVersion = data.lockVersion;
+    if (lockVersion === undefined) {
+      const current = await this.getWorkPackage(id);
+      lockVersion = current.lockVersion as number;
+    }
+    if (lockVersion !== undefined) {
+      payload.lockVersion = lockVersion;
+    }
 
     if (data.subject !== undefined) payload.subject = data.subject;
     if (data.startDate !== undefined) payload.startDate = data.startDate;
@@ -326,6 +377,35 @@ export class OpenProjectClient {
         };
       }
     }
+
+    this.applyCustomFields(payload, data.customFields);
+
+    return this.request<WorkPackage>(`/work_packages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Set (or remove) the parent of a work package.
+   * Fetches the work package first to obtain the current lockVersion,
+   * which OpenProject requires for PATCH requests (optimistic locking).
+   * Pass parentId: null to remove the current parent.
+   */
+  async setWorkPackageParent(
+    id: string | number,
+    parentId: number | null
+  ): Promise<WorkPackage> {
+    const current = await this.getWorkPackage(id.toString());
+
+    const payload = {
+      lockVersion: current.lockVersion as number,
+      _links: {
+        parent: {
+          href: parentId === null ? null : `/api/v3/work_packages/${parentId}`,
+        },
+      },
+    };
 
     return this.request<WorkPackage>(`/work_packages/${id}`, {
       method: 'PATCH',
@@ -961,5 +1041,77 @@ export class OpenProjectClient {
     await this.request<void>(`/time_entries/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Relation Management Methods
+
+  async createRelation(data: {
+    fromId: number;
+    toId: number;
+    type: CreatableRelationType;
+    description?: string;
+    lag?: number;
+  }): Promise<Relation> {
+    const payload: any = {
+      type: data.type,
+      _links: {
+        from: {
+          href: `/api/v3/work_packages/${data.fromId}`,
+        },
+        to: {
+          href: `/api/v3/work_packages/${data.toId}`,
+        },
+      },
+    };
+
+    if (data.description !== undefined) {
+      payload.description = data.description;
+    }
+
+    if (data.lag !== undefined) {
+      payload.lag = data.lag;
+    }
+
+    return this.request<Relation>(`/work_packages/${data.fromId}/relations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateRelation(
+    relationId: string | number,
+    data: {
+      type?: CreatableRelationType;
+      description?: string;
+      lag?: number;
+    }
+  ): Promise<Relation> {
+    const payload: any = {};
+
+    if (data.type !== undefined) payload.type = data.type;
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.lag !== undefined) payload.lag = data.lag;
+
+    return this.request<Relation>(`/relations/${relationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteRelation(relationId: string | number): Promise<void> {
+    await this.request<void>(`/relations/${relationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Schema Methods
+
+  async getWorkPackageSchema(
+    projectId: number,
+    typeId: number
+  ): Promise<Schema> {
+    return this.request<Schema>(
+      `/work_packages/schemas/${projectId}-${typeId}`
+    );
   }
 }
