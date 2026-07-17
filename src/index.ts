@@ -8,6 +8,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { OpenProjectClient } from './openproject-client.js';
+import type { CreatableRelationType, CustomFieldValues } from './types.js';
 
 const server = new Server(
   {
@@ -219,6 +220,12 @@ const tools: Tool[] = [
           type: 'string',
           description: 'Due date (YYYY-MM-DD format)',
         },
+        customFields: {
+          type: 'object',
+          description:
+            'Custom field values keyed by property name (e.g., {"customField1": "value"}). Raw values (string/number/boolean) are set directly; for list-type custom fields pass a link object like {"customField2": {"href": "/api/v3/custom_options/5"}} (or an array of such objects for multi-select). Use get_work_package_schema to discover available custom fields and their allowed values.',
+          additionalProperties: true,
+        },
       },
       required: ['subject', 'projectId'],
     },
@@ -264,6 +271,12 @@ const tools: Tool[] = [
         percentageDone: {
           type: 'number',
           description: 'Percentage done (0-100)',
+        },
+        customFields: {
+          type: 'object',
+          description:
+            'Custom field values keyed by property name (e.g., {"customField1": "value"}). Raw values (string/number/boolean) are set directly; for list-type custom fields pass a link object like {"customField2": {"href": "/api/v3/custom_options/5"}} (or an array of such objects for multi-select). Use get_work_package_schema to discover available custom fields and their allowed values.',
+          additionalProperties: true,
         },
       },
       required: ['id'],
@@ -562,6 +575,146 @@ const tools: Tool[] = [
       required: ['workPackageId'],
     },
   },
+  {
+    name: 'create_relation',
+    description:
+      'Create a relation (dependency/link) between two work packages, e.g. follows/precedes for scheduling dependencies or blocks/blocked for blockers. The relation goes FROM one work package TO another; for example type "follows" means the "from" work package follows (starts after) the "to" work package.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromId: {
+          type: 'number',
+          description: 'ID of the work package the relation originates from',
+        },
+        toId: {
+          type: 'number',
+          description: 'ID of the work package the relation points to',
+        },
+        type: {
+          type: 'string',
+          enum: [
+            'relates',
+            'duplicates',
+            'duplicated',
+            'blocks',
+            'blocked',
+            'precedes',
+            'follows',
+            'includes',
+            'partof',
+            'requires',
+            'required',
+          ],
+          description: 'Relation type',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional description of the relation',
+        },
+        lag: {
+          type: 'number',
+          description:
+            'Delay in working days between the two work packages (only meaningful for precedes/follows relations)',
+        },
+      },
+      required: ['fromId', 'toId', 'type'],
+    },
+  },
+  {
+    name: 'update_relation',
+    description:
+      'Update an existing relation between work packages (change its type, description, or lag). Use get_work_package_relations to find relation IDs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        relationId: {
+          type: ['string', 'number'],
+          description: 'Relation ID',
+        },
+        type: {
+          type: 'string',
+          enum: [
+            'relates',
+            'duplicates',
+            'duplicated',
+            'blocks',
+            'blocked',
+            'precedes',
+            'follows',
+            'includes',
+            'partof',
+            'requires',
+            'required',
+          ],
+          description: 'New relation type',
+        },
+        description: {
+          type: 'string',
+          description: 'New description of the relation',
+        },
+        lag: {
+          type: 'number',
+          description:
+            'New delay in working days (only meaningful for precedes/follows relations)',
+        },
+      },
+      required: ['relationId'],
+    },
+  },
+  {
+    name: 'delete_relation',
+    description:
+      'Delete a relation between work packages by relation ID. Use get_work_package_relations to find relation IDs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        relationId: {
+          type: ['string', 'number'],
+          description: 'Relation ID',
+        },
+      },
+      required: ['relationId'],
+    },
+  },
+  {
+    name: 'set_work_package_parent',
+    description:
+      'Set or remove the parent of a work package (hierarchy management). Handles lockVersion automatically. Set parentId to a work package ID to move it under that parent, or omit/set parentId to null to remove the current parent (make it top-level).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workPackageId: {
+          type: ['string', 'number'],
+          description: 'Work package ID to re-parent',
+        },
+        parentId: {
+          type: ['number', 'null'],
+          description:
+            'Parent work package ID, or null to remove the current parent',
+        },
+      },
+      required: ['workPackageId'],
+    },
+  },
+  {
+    name: 'get_work_package_schema',
+    description:
+      'Get the work package schema for a project/type combination. Lists all available fields (including custom fields like customField1) with their types, names, whether they are required/writable, and allowed values. Use this to discover which custom fields exist before setting them via create_work_package or update_work_package.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'number',
+          description: 'Project ID',
+        },
+        typeId: {
+          type: 'number',
+          description: 'Work package type ID',
+        },
+      },
+      required: ['projectId', 'typeId'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -674,6 +827,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parentId: args.parentId as number | undefined,
           startDate: args.startDate as string | undefined,
           dueDate: args.dueDate as string | undefined,
+          customFields: args.customFields as CustomFieldValues | undefined,
         });
         return {
           content: [
@@ -695,6 +849,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           dueDate: args.dueDate as string | undefined,
           statusId: args.statusId as number | undefined,
           percentageDone: args.percentageDone as number | undefined,
+          customFields: args.customFields as CustomFieldValues | undefined,
         });
         return {
           content: [
@@ -948,6 +1103,85 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_work_package_comments': {
         const result = await client.getWorkPackageComments(args.workPackageId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_relation': {
+        const result = await client.createRelation({
+          fromId: args.fromId as number,
+          toId: args.toId as number,
+          type: args.type as CreatableRelationType,
+          description: args.description as string | undefined,
+          lag: args.lag as number | undefined,
+        });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'update_relation': {
+        const result = await client.updateRelation(
+          args.relationId as string | number,
+          {
+            type: args.type as CreatableRelationType | undefined,
+            description: args.description as string | undefined,
+            lag: args.lag as number | undefined,
+          }
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_relation': {
+        await client.deleteRelation(args.relationId as string | number);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Relation ${args.relationId} deleted successfully`,
+            },
+          ],
+        };
+      }
+
+      case 'set_work_package_parent': {
+        const result = await client.setWorkPackageParent(
+          args.workPackageId as string | number,
+          (args.parentId ?? null) as number | null
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_work_package_schema': {
+        const result = await client.getWorkPackageSchema(
+          args.projectId as number,
+          args.typeId as number
+        );
         return {
           content: [
             {
