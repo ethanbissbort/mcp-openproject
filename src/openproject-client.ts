@@ -15,6 +15,15 @@ import type {
   Relation,
   WorkPackageHierarchy,
   Activity,
+  Role,
+  Membership,
+  Version,
+  CreatableRelationType,
+  CustomFieldValues,
+  Schema,
+  Attachment,
+  Query,
+  WikiPage,
 } from './types.js';
 
 export class OpenProjectClient {
@@ -117,6 +126,38 @@ export class OpenProjectClient {
     } catch (error) {
       console.warn(`Failed to extract ID from href: ${href}`, error);
       return null;
+    }
+  }
+
+  /**
+   * Merge custom field values into a work package payload.
+   * Raw values (string/number/boolean) are set directly on the payload;
+   * values of the form { href: "..." } (or arrays of them) are merged into
+   * _links under the same key (list/user/version-type custom fields).
+   */
+  private applyCustomFields(payload: any, customFields?: CustomFieldValues): void {
+    if (!customFields) {
+      return;
+    }
+
+    for (const [key, value] of Object.entries(customFields)) {
+      const isHrefObject =
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        'href' in value;
+      const isHrefArray =
+        Array.isArray(value) &&
+        value.every(
+          (item) => item !== null && typeof item === 'object' && 'href' in item
+        );
+
+      if (isHrefObject || isHrefArray) {
+        payload._links = payload._links || {};
+        payload._links[key] = value;
+      } else {
+        payload[key] = value;
+      }
     }
   }
 
@@ -231,6 +272,7 @@ export class OpenProjectClient {
     parentId?: number;
     startDate?: string;
     dueDate?: string;
+    customFields?: CustomFieldValues;
   }): Promise<WorkPackage> {
     const payload: any = {
       subject: data.subject,
@@ -269,6 +311,8 @@ export class OpenProjectClient {
     if (data.startDate) payload.startDate = data.startDate;
     if (data.dueDate) payload.dueDate = data.dueDate;
 
+    this.applyCustomFields(payload, data.customFields);
+
     return this.request<WorkPackage>('/work_packages', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -286,9 +330,22 @@ export class OpenProjectClient {
       dueDate?: string;
       statusId?: number;
       percentageDone?: number;
+      lockVersion?: number;
+      customFields?: CustomFieldValues;
     }
   ): Promise<WorkPackage> {
     const payload: any = {};
+
+    // OpenProject requires the current lockVersion for PATCH requests on
+    // work packages (optimistic locking). Fetch it if not provided.
+    let lockVersion = data.lockVersion;
+    if (lockVersion === undefined) {
+      const current = await this.getWorkPackage(id);
+      lockVersion = current.lockVersion as number;
+    }
+    if (lockVersion !== undefined) {
+      payload.lockVersion = lockVersion;
+    }
 
     if (data.subject !== undefined) payload.subject = data.subject;
     if (data.startDate !== undefined) payload.startDate = data.startDate;
@@ -323,6 +380,35 @@ export class OpenProjectClient {
         };
       }
     }
+
+    this.applyCustomFields(payload, data.customFields);
+
+    return this.request<WorkPackage>(`/work_packages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Set (or remove) the parent of a work package.
+   * Fetches the work package first to obtain the current lockVersion,
+   * which OpenProject requires for PATCH requests (optimistic locking).
+   * Pass parentId: null to remove the current parent.
+   */
+  async setWorkPackageParent(
+    id: string | number,
+    parentId: number | null
+  ): Promise<WorkPackage> {
+    const current = await this.getWorkPackage(id.toString());
+
+    const payload = {
+      lockVersion: current.lockVersion as number,
+      _links: {
+        parent: {
+          href: parentId === null ? null : `/api/v3/work_packages/${parentId}`,
+        },
+      },
+    };
 
     return this.request<WorkPackage>(`/work_packages/${id}`, {
       method: 'PATCH',
@@ -686,7 +772,7 @@ export class OpenProjectClient {
     });
 
     return this.request<Collection<Activity>>(
-      `/api/v3/work_packages/${workPackageId}/activities?${params}`
+      `/work_packages/${workPackageId}/activities?${params}`
     );
   }
 
@@ -696,5 +782,499 @@ export class OpenProjectClient {
     return activities._embedded.elements.filter(
       (activity) => activity.comment && activity.comment.raw
     );
+  }
+
+  // Membership and Role Methods
+
+  async listRoles(): Promise<Collection<Role>> {
+    return this.request<Collection<Role>>('/roles');
+  }
+
+  async getRole(id: string): Promise<Role> {
+    return this.request<Role>(`/roles/${id}`);
+  }
+
+  async listMemberships(params?: {
+    filters?: string;
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Membership>> {
+    const queryParams = new URLSearchParams();
+    if (params?.filters) queryParams.set('filters', params.filters);
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Membership>>(
+      `/memberships${query ? '?' + query : ''}`
+    );
+  }
+
+  async getMembership(id: string): Promise<Membership> {
+    return this.request<Membership>(`/memberships/${id}`);
+  }
+
+  async createMembership(data: {
+    projectId: number;
+    userId: number;
+    roleIds: number[];
+    notificationMessage?: string;
+  }): Promise<Membership> {
+    const payload: any = {
+      _links: {
+        project: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+        principal: {
+          href: `/api/v3/users/${data.userId}`,
+        },
+        roles: data.roleIds.map((roleId) => ({
+          href: `/api/v3/roles/${roleId}`,
+        })),
+      },
+    };
+
+    if (data.notificationMessage) {
+      payload._meta = {
+        notificationMessage: {
+          raw: data.notificationMessage,
+        },
+      };
+    }
+
+    return this.request<Membership>('/memberships', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateMembership(
+    id: string,
+    data: {
+      roleIds: number[];
+    }
+  ): Promise<Membership> {
+    const payload = {
+      _links: {
+        roles: data.roleIds.map((roleId) => ({
+          href: `/api/v3/roles/${roleId}`,
+        })),
+      },
+    };
+
+    return this.request<Membership>(`/memberships/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await this.request<void>(`/memberships/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Version (Milestone/Roadmap) Methods
+
+  async listVersions(params?: {
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Version>> {
+    const queryParams = new URLSearchParams();
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Version>>(
+      `/versions${query ? '?' + query : ''}`
+    );
+  }
+
+  async listProjectVersions(projectId: string | number): Promise<Collection<Version>> {
+    return this.request<Collection<Version>>(`/projects/${projectId}/versions`);
+  }
+
+  async getVersion(id: string): Promise<Version> {
+    return this.request<Version>(`/versions/${id}`);
+  }
+
+  async createVersion(data: {
+    projectId: number;
+    name: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: 'open' | 'locked' | 'closed';
+    sharing?: string;
+  }): Promise<Version> {
+    const payload: any = {
+      name: data.name,
+      _links: {
+        definingProject: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+      },
+    };
+
+    if (data.description !== undefined) {
+      payload.description = {
+        format: 'markdown',
+        raw: data.description,
+      };
+    }
+
+    if (data.startDate) payload.startDate = data.startDate;
+    if (data.endDate) payload.endDate = data.endDate;
+    if (data.status) payload.status = data.status;
+    if (data.sharing) payload.sharing = data.sharing;
+
+    return this.request<Version>('/versions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateVersion(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      status?: 'open' | 'locked' | 'closed';
+      sharing?: string;
+    }
+  ): Promise<Version> {
+    const payload: any = {};
+
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.startDate !== undefined) payload.startDate = data.startDate;
+    if (data.endDate !== undefined) payload.endDate = data.endDate;
+    if (data.status !== undefined) payload.status = data.status;
+    if (data.sharing !== undefined) payload.sharing = data.sharing;
+
+    if (data.description !== undefined) {
+      payload.description = {
+        format: 'markdown',
+        raw: data.description,
+      };
+    }
+
+    return this.request<Version>(`/versions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteVersion(id: string): Promise<void> {
+    await this.request<void>(`/versions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setWorkPackageVersion(
+    workPackageId: string | number,
+    versionId: number
+  ): Promise<WorkPackage> {
+    // Fetch the work package first to obtain its current lockVersion
+    // (required by OpenProject for optimistic locking on updates)
+    const workPackage = await this.getWorkPackage(workPackageId.toString());
+
+    const payload = {
+      lockVersion: workPackage.lockVersion,
+      _links: {
+        version: {
+          href: `/api/v3/versions/${versionId}`,
+        },
+      },
+    };
+
+    return this.request<WorkPackage>(`/work_packages/${workPackageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Project Lifecycle Methods
+
+  async deleteProject(id: string): Promise<void> {
+    await this.request<void>(`/projects/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Time Entry Lifecycle Methods
+
+  async updateTimeEntry(
+    id: string,
+    data: {
+      hours?: number;
+      spentOn?: string;
+      comment?: string;
+      activityId?: number;
+    }
+  ): Promise<TimeEntry> {
+    const payload: any = {};
+
+    if (data.hours !== undefined) payload.hours = `PT${data.hours}H`;
+    if (data.spentOn !== undefined) payload.spentOn = data.spentOn;
+
+    if (data.comment !== undefined) {
+      payload.comment = {
+        format: 'markdown',
+        raw: data.comment,
+      };
+    }
+
+    if (data.activityId !== undefined) {
+      payload._links = {
+        activity: {
+          href: `/api/v3/time_entries/activities/${data.activityId}`,
+        },
+      };
+    }
+
+    return this.request<TimeEntry>(`/time_entries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteTimeEntry(id: string): Promise<void> {
+    await this.request<void>(`/time_entries/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Relation Management Methods
+
+  async createRelation(data: {
+    fromId: number;
+    toId: number;
+    type: CreatableRelationType;
+    description?: string;
+    lag?: number;
+  }): Promise<Relation> {
+    const payload: any = {
+      type: data.type,
+      _links: {
+        from: {
+          href: `/api/v3/work_packages/${data.fromId}`,
+        },
+        to: {
+          href: `/api/v3/work_packages/${data.toId}`,
+        },
+      },
+    };
+
+    if (data.description !== undefined) {
+      payload.description = data.description;
+    }
+
+    if (data.lag !== undefined) {
+      payload.lag = data.lag;
+    }
+
+    return this.request<Relation>(`/work_packages/${data.fromId}/relations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateRelation(
+    relationId: string | number,
+    data: {
+      type?: CreatableRelationType;
+      description?: string;
+      lag?: number;
+    }
+  ): Promise<Relation> {
+    const payload: any = {};
+
+    if (data.type !== undefined) payload.type = data.type;
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.lag !== undefined) payload.lag = data.lag;
+
+    return this.request<Relation>(`/relations/${relationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteRelation(relationId: string | number): Promise<void> {
+    await this.request<void>(`/relations/${relationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Schema Methods
+
+  async getWorkPackageSchema(
+    projectId: number,
+    typeId: number
+  ): Promise<Schema> {
+    return this.request<Schema>(
+      `/work_packages/schemas/${projectId}-${typeId}`
+    );
+  }
+
+  async addWorkPackageComment(
+    workPackageId: string | number,
+    comment: string,
+    notify?: boolean
+  ): Promise<Activity> {
+    const queryParams = new URLSearchParams();
+    if (notify !== undefined) queryParams.set('notify', notify.toString());
+
+    const query = queryParams.toString();
+    return this.request<Activity>(
+      `/work_packages/${workPackageId}/activities${query ? '?' + query : ''}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          comment: {
+            raw: comment,
+          },
+        }),
+      }
+    );
+  }
+
+  // Attachment Methods
+
+  async listWorkPackageAttachments(
+    workPackageId: string | number
+  ): Promise<Collection<Attachment>> {
+    return this.request<Collection<Attachment>>(
+      `/work_packages/${workPackageId}/attachments`
+    );
+  }
+
+  async uploadWorkPackageAttachment(data: {
+    workPackageId: string | number;
+    fileName: string;
+    fileContentBase64: string;
+    contentType?: string;
+    description?: string;
+  }): Promise<Attachment> {
+    const url = `${this.baseUrl}/api/v3/work_packages/${data.workPackageId}/attachments`;
+
+    const metadata: any = { fileName: data.fileName };
+    if (data.description) {
+      metadata.description = { raw: data.description };
+    }
+
+    const fileBuffer = Buffer.from(data.fileContentBase64, 'base64');
+    const blob = new Blob([fileBuffer], {
+      type: data.contentType || 'application/octet-stream',
+    });
+
+    const formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+    formData.append('file', blob, data.fileName);
+
+    // Direct fetch: the shared request() helper forces Content-Type: application/json,
+    // but multipart uploads need fetch to set the multipart boundary itself.
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.authHeader,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMessage = response.statusText;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json() as ErrorResponse;
+          errorMessage = errorData.message || errorMessage;
+        } else {
+          const textError = await response.text();
+          errorMessage = textError || errorMessage;
+        }
+      } catch {
+        // If parsing fails, use status text
+      }
+      throw new Error(`OpenProject API error (${response.status}): ${errorMessage}`);
+    }
+
+    return response.json() as Promise<Attachment>;
+  }
+
+  async deleteAttachment(id: string | number): Promise<void> {
+    await this.request<void>(`/attachments/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Query (Saved View) Methods
+
+  async listQueries(params?: {
+    filters?: string;
+    pageSize?: number;
+    offset?: number;
+  }): Promise<Collection<Query>> {
+    const queryParams = new URLSearchParams();
+    if (params?.filters) queryParams.set('filters', params.filters);
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    if (params?.offset) queryParams.set('offset', params.offset.toString());
+
+    const query = queryParams.toString();
+    return this.request<Collection<Query>>(
+      `/queries${query ? '?' + query : ''}`
+    );
+  }
+
+  async getQuery(id: string | number): Promise<Query> {
+    return this.request<Query>(`/queries/${id}`);
+  }
+
+  async createQuery(data: {
+    name: string;
+    projectId?: string | number;
+    filters?: unknown[];
+    groupBy?: string;
+    sortBy?: unknown[];
+    timelineVisible?: boolean;
+    public?: boolean;
+    starred?: boolean;
+  }): Promise<Query> {
+    const payload: any = {
+      name: data.name,
+      filters: data.filters ?? [],
+      public: data.public ?? false,
+      starred: data.starred ?? false,
+      timelineVisible: data.timelineVisible ?? false,
+    };
+
+    if (data.groupBy !== undefined) payload.groupBy = data.groupBy;
+    if (data.sortBy !== undefined) payload.sortBy = data.sortBy;
+
+    if (data.projectId !== undefined) {
+      payload._links = {
+        project: {
+          href: `/api/v3/projects/${data.projectId}`,
+        },
+      };
+    }
+
+    return this.request<Query>('/queries', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteQuery(id: string | number): Promise<void> {
+    await this.request<void>(`/queries/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Wiki Page Methods
+
+  async getWikiPage(id: string | number): Promise<WikiPage> {
+    return this.request<WikiPage>(`/wiki_pages/${id}`);
   }
 }

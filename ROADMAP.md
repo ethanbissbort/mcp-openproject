@@ -2,14 +2,36 @@
 
 **Goal**: Enable Claude to perform high-level strategic analysis and planning assistance for OpenProject projects.
 
-**Current State**: Phase 1 Complete - Enhanced Data Access ✅
+**Current State**: Phase 1 Complete - Enhanced Data Access ✅ + Write-Capability Expansion ✅
 **Target State**: Strategic analysis, gap identification, executive summaries, and planning assistance 🎯
 
 **Progress**:
 - ✅ Phase 1: Enhanced Data Access (Foundation) - **COMPLETE**
+- ✅ Write-Capability Expansion (2026-07-17) - **COMPLETE** (see below)
 - 🔄 Phase 2: Rich Querying & Filtering - **NEXT**
 - ⏸️ Phase 3: Analytics & Aggregation - Pending
 - ⏸️ Phase 4: Strategic Analysis Tools - Pending
+
+---
+
+## Write-Capability Expansion ✅ COMPLETE (2026-07-17)
+
+Closed the critical gaps identified in `validation/MCP_Connector_Assessment_Report.md` (30 new tools, 27 → 57 total):
+
+- [x] **Relation management** — `create_relation`, `update_relation`, `delete_relation` (blocks, precedes/follows, relates, duplicates, includes, requires) for task dependencies and phase gates
+- [x] **Parent assignment** — `set_work_package_parent` with automatic `lockVersion` handling (also fixed the latent lockVersion bug in `update_work_package`)
+- [x] **Custom field support** — `customFields` parameter on create/update work package + `get_work_package_schema` for field discovery
+- [x] **Versions/Milestones** — full version CRUD (`list_versions`, `list_project_versions`, `get_version`, `create_version`, `update_version`, `delete_version`) + `set_work_package_version` for Roadmap-based phase tracking
+- [x] **Project lifecycle** — `delete_project`
+- [x] **Time entry lifecycle** — `update_time_entry`, `delete_time_entry`
+- [x] **Memberships & roles** — `list_roles`, `get_role`, `list_memberships`, `get_membership`, `create_membership`, `update_membership`, `delete_membership`
+- [x] **Comments** — `add_work_package_comment` (write capability; read existed)
+- [x] **Attachments** — `list_work_package_attachments`, `upload_work_package_attachment` (multipart, base64 input), `delete_attachment`
+- [x] **Saved queries** — `list_queries`, `get_query`, `create_query`, `delete_query` (saved views with filters/groupBy/sortBy/timeline)
+- [x] **Wiki** — `get_wiki_page` (read-only; API v3 limitation)
+- [x] **Bug fix** — corrected double `/api/v3` prefix in `list_work_package_activities` that broke activity/comment reads
+
+Remaining known gaps (no public API v3 support): custom field *definition* creation, project module enablement, dashboard widgets, wiki page creation.
 
 ---
 
